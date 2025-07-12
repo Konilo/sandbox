@@ -1,0 +1,14 @@
+{
+    "recommendations": [
+        "charliermarsh.ruff",
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-python.debugpy",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "quarto.quarto",
+        "rdebugger.r-debugger",
+        "reditorsupport.r",
+        "reditorsupport.r-syntax"
+    ]
+}

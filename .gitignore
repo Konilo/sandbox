@@ -45,5 +45,11 @@ docs/
 # translation temp files
 po/*~
 
-# RStudio Connect folder
-rsconnect/
+# Python environment and package management
+__pycache__/
+*.pyc
+.env
+
+draft.R
+Dockerfile2
+sandbox/*demo*/

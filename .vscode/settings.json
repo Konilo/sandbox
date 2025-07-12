@@ -1,0 +1,17 @@
+{
+    "r.rterm.linux": "/usr/local/bin/R",
+    "r.debugger.timeouts.startup": 100000,
+    "quarto.render.previewType": "none",
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
+    },
+    "notebook.formatOnSave.enabled": true,
+    "notebook.codeActionsOnSave": {
+        "notebook.source.fixAll": "explicit"
+    }
+}

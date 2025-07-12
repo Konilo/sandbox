@@ -47,3 +47,7 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+draft.R
+Dockerfile2
+sandbox/*demo*/

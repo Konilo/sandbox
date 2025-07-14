@@ -1,0 +1,267 @@
+---
+title: "Lifecycle Investing"
+author: "Konilo Zio"
+date: "`r format(Sys.time(), '%d/%m/%Y')`"
+toc: true
+format: 
+  html:
+    code-fold: true
+    number-sections: true
+    toc-expand: true
+    toc-depth: 5
+    code-tools: true
+---
+
+```{r setup}
+#| echo: false
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(plotly)
+```
+
+
+# Introduction
+
+Lifecycle investing is a saving and investing model originally developed by Ayres & Nalebuff ([2010](https://www.amazon.com/gp/product/0465018297)) which excels in the realm of retirement planning. This document dives into a few striking aspects of this approach in the context of retirement planning.
+
+For a proper introduction to lifecycle investing:
+
+- refer to the book by Ayres & Nalebuff,
+- read the [documentation of the TPAW Planner](https://tpawplanner.com/learn) by Ben Mathew,
+- or listen to him on [The Rational Reminder Podcast Episode 340](https://open.spotify.com/episode/4QKJlnDQQxCm0JoxYg4hLI).
+
+
+# Considering the present value of the future savings
+
+In lifecycle investing, the capital to consider and manage at each point in time -- the *total portfolio* ($TP$) -- is the sum of the current savings -- the *savings portfolio* ($SP$) -- and of the present of value of the future savings ($CVFS$) (@eq-tp). Let's explain.
+
+$$
+TP = SP + CVFS
+$$ {#eq-tp}
+
+- Based on one's level of risk aversion, a certain share of their investment portfolio should be allocated to risky assets (stocks, typically) and the rest to relatively less risky assets (bonds, typically) -- this is the Merton-Samuelson share.
+- One simplistic way to apply this share is to apply it to the savings portfolio i.e., the capital one currently possesses in the bank (or in the form of real estate, etc.).
+- The issue with this method is that it ignores the capital that has not yet materialized but is likely to in the future: that is savings from future salaries, typically. On one hand, it might feel risky to bet on these future savings -- who knows what the future holds -- but, on the other hand, it is generally overly conservative to assume that no future savings will ever be made. So, it makes sense to make a cautious but considerable assumption for planning sakes.
+- Since we are relatively confident that those future savings will actually be made, they can be added to the savings portfolio like if they were bonds (low return and low risk). 
+
+Now, how to compute their *current* value? Considering those savings like bonds implies that their value grows up until they reach maturity and migrate as savings in the savings portfolio. That means that their current value depends on the yield of bonds and on the time between now and the materialization of the saving. If we consider that 10 k€ will be saved from one's salary 10 years from now and using a yearly yield of 1%, then the current value of those savings is $10000 / (1 + 0.01)^{10}=9052.87$. This is like rewinding 10 years of yield. The yield manipulated this way is also called a *discount rate*: we apply it in reverse to discount the final value and obtain the current value. @eq-cvfs-i provides the formula with $CVFS_i$ being the current value of the future saving *i*, $FS_i$ being the future saving *i* in question, $DR$ being the discount rate, and $NY$ corresponding to the number of years between now and the materialization of saving *i*.
+
+$$
+CVFS_i = \frac{FS_i}{(1 + DR)^{NY}}
+$$ {#eq-cvfs-i}
+
+To generalize this to all future savings (future savings *1* to *n*), we just make a sum and use the number of years that corresponds to each ($NY_i$):
+$$
+CVFS = \sum_{i=1}^{n}\frac{FS_i}{(1 + DR)^{NY_i}}
+$$ {#eq-cvfs}
+
+Let's take a simple scenario and illustrate the evolution of the total portfolio. We'll consider a person that saves a constant 1 k€ per month and a discount rate of 1%, and visualize their total portfolio from age 23 to 65 i.e., during their working life, excluding capital gains in the savings portfolio (0% yield). We can see that future savings go from representing 0% to 100% of the total portfolio as they gradually materialize and get turned into actual savings (@fig-total-over-life).
+
+```{r}
+#| label: fig-total-over-life
+#| fig-cap: "Total portfolio over life (1 k€ saved monthly from 23 to 65 years old, 0% yield on savings, 1% discount rate)."
+
+compute_cvfs <- function(month_idx, last_month_idx, monthly_savings, discount_rate) {
+    if (month_idx == last_month_idx) {
+        return(0)
+    }
+    month_idx_cvfs <- 0
+    for (future_month_idx in (month_idx + 1):last_month_idx) {
+        month_idx_cvfs <- month_idx_cvfs +
+            monthly_savings / (1 + discount_rate)^((last_month_idx - future_month_idx) / 12)
+    }
+    return(month_idx_cvfs)
+}
+
+project_no_return_pf <- function(age_start, age_stop, monthly_savings, discount_rate) {
+    last_month_idx <- (age_stop - age_start) * 12
+    data.table(
+        month_idx = 1:last_month_idx
+    )[
+        ,
+        `:=`(
+            age = age_start + month_idx / 12,
+            sp = monthly_savings * month_idx,
+            cvfs = sapply(
+                month_idx,
+                function(idx) compute_cvfs(idx, last_month_idx, monthly_savings, discount_rate)
+            )
+        )
+    ][
+        ,
+        tp := sp + cvfs
+    ]
+}
+
+dt <- project_no_return_pf(23, 65, 1000, 0.01)
+
+# Update colors for SP and TP/CVFS in plots
+plot_ly(
+    data = dt,
+    x = ~age,
+    y = ~sp,
+    type = "bar",
+    name = "Savings Portfolio",
+    marker = list(color = "#1f77b4")
+) |>
+    add_trace(
+        y = ~cvfs,
+        name = "Current Value of Future Savings",
+        marker = list(color = "#ff7f0e")
+    ) |>
+    layout(
+        barmode = "stack",
+        title = "",
+        xaxis = list(title = "Age"),
+        yaxis = list(title = "Portfolio Value"),
+        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2),
+        hovermode = "x"
+    )
+```
+
+Given that we consider future savings as bonds, it ensues that the asset class allocation on the total portfolio is inevitably heavily skewed in favor of bonds during a good portion of one's life: when future savings represent 90% of the total portfolio, even if the savings portfolio is 100% stocks, the total portfolio seats at only 10% stocks. This is an issue for two reasons:
+
+- the Merton-Samuelson share is not respected whereas it is meant to provide the adequate balance between expected returns and risk for the person.
+  - Applying the share to the savings portfolio instead of the total one greatly accentuates the issue. If we consider that our person from above has a Merton-Samuelson share of 60%, @fig-alloc-over-life shows that this proportion is only reached when all savings materialized (i.e., at the end of the working life) when the share is applied to the savings protfolio, while it is reached at age 47 when it is applied on the total portfolio. In other words, considering future savings justifies ramping up the allocation for risky assets more rapidly since, during a large part of one's working life, those future savings imply that the target allocation for bonds (i.e., 100% minus the Merton-Samuelson share) is surpassed.
+  - We'll see in @sec-lev that leverage is a potential solution to further bridge the gap.
+- And risk taking is poorly diversified over time as we'll see in @sec-temp-div.
+
+```{r}
+#| label: fig-alloc-over-life
+#| fig-cap: "Asset class allocation over life (60% Merton-Samuelson share, no leverage, 0% yield on savings)"
+
+sm_share <- .6
+# Share of stocks in the TP when the M-S share is applied to the SP
+dt[
+    ,
+    stocks_owned_appl_sp := sp * sm_share
+][
+    ,
+    stocks_share_tp_appl_sp := stocks_owned_appl_sp / tp
+]
+
+# Share of stocks in the TP when the M-S share is applied to the TP
+dt[
+    ,
+    stocks_owned_appl_tp := ifelse(sp < tp * sm_share, sp, tp * sm_share)
+][
+    ,
+    stocks_share_tp_appl_tp := stocks_owned_appl_tp / tp
+]
+
+plot_ly(data = dt, x = ~age) |>
+    add_lines(
+        y = ~ stocks_share_tp_appl_sp * 100,
+        name = "Stocks % in Total Portfolio When Merton-Samuelson Share Applied to Savings Portfolio",
+        line = list(color = "#1f77b4")
+    ) |>
+    add_lines(
+        y = ~ stocks_share_tp_appl_tp * 100,
+        name = "Stocks % in Total Portfolio When Merton-Samuelson Share Applied to Total Portfolio",
+        line = list(color = "#ff7f0e")
+    ) |>
+    layout(
+        title = "",
+        xaxis = list(title = "Age"),
+        yaxis = list(title = "Stocks Share"),
+        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2),
+        hovermode = "x"
+    )
+```
+
+
+# Temporal diversification {#sec-temp-div}
+
+Asset diversification was referred to as "the only free lunch" by Nobel Prize laurerate Harry Markowitz. It basically consists in putting one's eggs in many different baskets. But a similar principle also exists in the time dimension -- it's temporal diversification: capital exposition to the markets over life should be distributed over time, by opposition to being lumped over a period during which a crisis could occur, for instance. What is an "amount of exposition"? It corresponds to the duration multiplied by the amount of an investment, expressed in euro-months (or euro-years, etc.).
+
+@fig-temp-div shows how the total amount of exposition to stocks is distributed over the working life of our person depending on whether the Merton-Samuelson share is applied to their savings or total portfolio. We can see that the latter does a better job at smoothing the exposition over time.
+```{r}
+#| label: fig-temp-div
+#| fig-cap: "Exposition to stocks over life"
+
+# euro-months per 6-year bin
+years_step <- 6
+bins <- seq(
+    dt[, as.integer(min(age))],
+    dt[, as.integer(max(age))],
+    by = years_step
+)
+dt[, age_bin := cut(age, breaks = bins, include.lowest = TRUE, right = FALSE)]
+temp_div_dt <- dt[
+    ,
+    .(
+        stocks_euro_months_appl_sp = sum(stocks_owned_appl_sp),
+        stocks_euro_months_appl_tp = sum(stocks_owned_appl_tp)
+    ),
+    by = age_bin
+][
+    ,
+    `:=`(
+        share_tot_stocks_euro_months_appl_sp = stocks_euro_months_appl_sp / sum(stocks_euro_months_appl_sp),
+        share_tot_stocks_euro_months_appl_tp = stocks_euro_months_appl_tp / sum(stocks_euro_months_appl_tp),
+        ideal_share_tot_stocks_euro_months = 1 / length(bins)
+    )
+]
+
+plot_ly(
+    data = temp_div_dt,
+    x = ~age_bin,
+    y = ~ share_tot_stocks_euro_months_appl_sp * 100,
+    type = "bar",
+    name = "Merton-Samuelson Share Applied to Savings Portfolio",
+    marker = list(color = "#1f77b4")
+) |>
+    add_trace(
+        y = ~ share_tot_stocks_euro_months_appl_tp * 100,
+        name = "Merton-Samuelson Share Applied to Total Portfolio",
+        marker = list(color = "#ff7f0e")
+    ) |>
+    add_trace(
+        y = ~ ideal_share_tot_stocks_euro_months * 100,
+        name = "Perfect Temporal Diversification",
+        marker = list(color = "#2ca02c")
+    ) |>
+    layout(
+        title = "",
+        xaxis = list(title = paste0("Age (", years_step, "-year bins)")),
+        yaxis = list(title = "Share of Working Life Stocks Euro-months"),
+        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2),
+        hovermode = "x"
+    )
+
+stocks_expo_unsmoothness_appl_sp <- temp_div_dt[
+    ,
+    sum(abs(share_tot_stocks_euro_months_appl_sp - ideal_share_tot_stocks_euro_months))
+]
+stocks_expo_unsmoothness_appl_tp <- temp_div_dt[
+    ,
+    sum(abs(share_tot_stocks_euro_months_appl_tp - ideal_share_tot_stocks_euro_months))
+]
+```
+
+This smoothing can be quantified via the absolute difference between the share of stocks exposition and the share of stocks exposition in the theoretical scenario of ideal temporal diversification -- the lower this difference, the better the distribution. In the scenario where the Merton-Samuelson share is applied to the savings portfolio, the total absolute difference equals `r round(stocks_expo_unsmoothness_appl_sp * 100)` percentage points. When it is instead applied to the total portfolio, the total absolute difference equals `r round(stocks_expo_unsmoothness_appl_tp * 100)` percentage points -- that is a `r round(abs(stocks_expo_unsmoothness_appl_tp / stocks_expo_unsmoothness_appl_sp - 1) * 100)`% gain in temporal diversification in our fictional case.
+
+
+# Leverage {#sec-lev}
+
+We have showed that applying the Merton-Samuelson share to the total portfolio helps in better respecting one's level of risk aversion and in improving the level of temporal diversification. But the plots show that those improvements are far from complete. A possible solution to bridge the gap further is leverage: when one's savings portfolio is too small relative to one's total portfolio to completely apply the Merton-Samuelson share, they can borrow money and invest it in risky assets as part of their now-increased savings portfolio. This allows for a more rapid ramp up of the exposition to stocks in the first section of working life. The share is better respected and more risky assets exposition takes place at this early age hence spreading one's temporal exposition.
+
+On the paper, this is almost a no brainer for people with a low enough risk aversion. But actually implementing leverage is often complicated and/or implies additional risk factors. Those additional factors are:
+
+- the cost of borrowing (if high, leveraging is a loosing strategy),
+- and, in the case of leveraged ETFs (LETFs) with daily rebalancing, the volatility of the asset being leveraged -- as it reduces LETFs' price regardless of the price of the underlying asset (we'll come back to this in a future study).
+
+Ayres & Nalebuff ([2010](https://www.amazon.com/gp/product/0465018297)) advocated for a x2 leverage maximum. But, since then, borrowing became more expensive and taking a bet on this cost and on a low volatility in the future can be daunting. This lead Ben Mathew to exlude leverage from his TPAW Planner, for instance (cf. the "Leverage and Its Limits" section [here](https://tpawplanner.com/learn/future-savings-and-retirement-income)).
+
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+print(sessionInfo(), locale = FALSE)
+```

@@ -13,5 +13,6 @@
     "notebook.formatOnSave.enabled": true,
     "notebook.codeActionsOnSave": {
         "notebook.source.fixAll": "explicit"
-    }
+    },
+    "r.rpath.linux": "/usr/local/bin/R"
 }

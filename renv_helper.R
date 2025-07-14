@@ -4,12 +4,13 @@
 
 # Useful renv commands
 renv::status()
-?renv::status()
+?renv::status() # recommendations on how to manage different out-of-sync scenarios
+renv::dependencies()
+?renv::dependencies() # cf. .renvignore
 renv::repair()
 renv::snapshot()
-renv::dependencies()
+?renv::snapshot() # cf. type arg
 renv::clean()
-# renv::settings$snapshot.type("all")
 
 # Installing boilerplate packages
 renv::install("languageserver", prompt = FALSE)

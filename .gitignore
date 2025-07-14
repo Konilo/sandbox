@@ -53,3 +53,5 @@ __pycache__/
 draft.R
 Dockerfile2
 sandbox/*demo*/
+*.html
+*_files/

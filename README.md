@@ -5,7 +5,8 @@ Studies coded with R, Python, and [Quarto](https://quarto.org/), developed in a 
 
 ## Studies
 
-- [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd): an exploration of a few striking aspects of this approach in the context of retirement planning
+- [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd): an exploration of a few striking aspects of this approach in the context of retirement planning.
+- [Artprice100](https://github.com/Konilo/sandbox/tree/main/sandbox/artprice100/artprice100.qmd): a basic financial analysis of the Artprice100 index.
 
 
 ## Setup and reproduction of the results

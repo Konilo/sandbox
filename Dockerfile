@@ -1,4 +1,4 @@
-# Install OS and R 4.5.1
+# Install OS and (R 4.5.1)
 FROM rocker/r-ver:4.5.1
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv and Python 3.12
+# Install uv (latest) and Python (3.12)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     export PATH="/root/.local/bin:$PATH" && \
     uv python install 3.12
@@ -21,6 +21,9 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.7.32/quarto-1.7.32-linux-amd64.deb && \
     dpkg -i quarto-1.7.32-linux-amd64.deb && \
     rm quarto-1.7.32-linux-amd64.deb
+
+# Install TinyTeX (latest) for PDF rendering
+RUN quarto install tinytex
 
 # Install renv (latest) and R dependencies
 RUN R -e "install.packages('renv')"

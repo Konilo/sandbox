@@ -1,7 +1,7 @@
 ---
 title: "Artprice100©"
 author: "Konilo Zio"
-date: "`r format(Sys.time(), '%d/%m/%Y')`"
+date: "`r Sys.time()`"
 toc: true
 format: 
   pdf:
@@ -24,6 +24,7 @@ library(data.table)
 library(ggplot2)
 library(lubridate)
 library(readxl)
+library(knitr)
 
 if (getwd() == "/app") {
     setwd("sandbox/artprice100")
@@ -33,34 +34,61 @@ if (getwd() == "/app") {
 
 # Introduction
 
-The [Artprice100](https://fr.artprice.com/artmarketinsight/artprice-lance-pour-la-finance-et-les-investisseurs-son-indice-artprice100-constitue-des-blue-chips-du-marche-de-lart) is a financial index designed to monitor prices on the "blue chip" art market i.e., the subsection of the art market composed of the highest valued and most recognized artworks, globally. It was created in 2018 by the French company [Artprice](Artprice) (founded in 1987). The main stated goal of such an index is to provide financial operators (e.g., private banks) with a tool allowing them to monitor the blue chip art market without the need for artistic expertise.
+The [Artprice100](https://fr.artprice.com/artmarketinsight/artprice-lance-pour-la-finance-et-les-investisseurs-son-indice-artprice100-constitue-des-blue-chips-du-marche-de-lart) is a financial index designed to monitor prices on the "blue chip" art market i.e., the subsection of the art market composed of the highest-valued and most recognized artworks, globally. It was created in 2018 by the French company [Artprice](https://en.wikipedia.org/wiki/Artprice) (founded in 1987). The main stated goal of such an index is to provide financial operators (e.g., private banks) with a tool allowing them to monitor the blue chip art market without the need for artistic expertise.
 
-The value of the Artprice100 was arbitrarily initialized at 100 on 2000-01-01 and is reevaluated once a year -- on the 1st of January. The evaluation process is as follows:
+The value of the Artprice100 was arbitrarily initialized at 100 on January 1st 2000 and is reevaluated once a year -- on the 1st of January. The evaluation process is as follows:
 
-- On 2000-01-01, 100$ were figuratively invested into the artowrks of the 100 top artists in terms of turnover (sum of the transaction costs) and in terms of sales regularity. The way sales regularity is measured is undisclosed as far as I know, but Artprice states that at least 10 "homogeneous" artworks must be sold each year for an artist to be included. These selection criteria are measured over the previous five years (1995-1999 included). The weight of each artists depends on its turnover.
-- The following year (on 2001-01-01), based on auction data, the worth of the investment made on the previous year can be updated. The resulting value is reinvested on the top 100 artists selected based on the same criteria, but looking at a new 5-year window (1996-2000).
+- On January 1st 2000, $100 were figuratively invested into the artowrks of the 100 top artists in terms of turnover (sum of the transaction costs) and in terms of sales regularity. The way sales regularity is measured is undisclosed as far as I know, but Artprice states that at least 10 "homogeneous" artworks must be sold each year for an artist to be included. These selection criteria are measured over the previous five years (1995-1999 included). The weight of each artists depends on its turnover.
+- The following year (on January 1st 2000), based on auction data, the worth of the investment made on the previous year can be updated. The resulting value is reinvested on the top 100 artists selected based on the same criteria, but looking at a new 5-year window (1996-2000).
 - And so on.
 
 This process is overseen by an expert committee. It is not clear to me whether the evaluations are completely objective or if the committee subjectively influences the index values, somehow.
 
-
-# Scope
-
 In this document, we will carry out a basic financial analysis of the Artprice100 to put in it perspective with conventional financial assets given that, as far as I know, Artprice100 is absent from trading platforms and exchanges (e.g., via ETFs).
 
-As a benchmark, conventional financial index, we will use the MSCI World index (USD). This a market-capitalization-weighted index covering publicly-traded companies in developed countries. We will use the "net" level of the index meaning that dividends are reinvested with taxes considered.
 
-Index values were retrived from [this](https://www.artprice.com/artmarketinsight/the-artprice100-index-of-blue-chip-artists-loses-8-3-in-2024) page for the Artprice100 and from [this](https://www.msci.com/indexes/index/990100) one for the MSCI World index.
+# Materials and Methods
+
+Artprice100 values were retrieved from [artprice.com](https://www.artprice.com/artmarketinsight/the-artprice100-index-of-blue-chip-artists-loses-8-3-in-2024).
+
+As a benchmark, conventional financial index, we will use the MSCI World index (USD). This a market-capitalization-weighted index covering publicly-traded companies in developed countries. We will use the "net" level of the index meaning that dividends are reinvested with taxes considered. Data was retrieved from [msci.com](https://www.msci.com/indexes/index/990100).
+
+Both indexes are converted from USD to EUR using exchange rates retrieved from [investing.com](https://www.investing.com/currencies/usd-eur-historical-data).
+
+And they are subsequently inflation-corrected using harmonized consumer price index values for France retrieved from [insee.fr](https://www.insee.fr/en/statistiques/serie/001759971). Thus, all returns and price changes are expressed in real terms, not in nominal terms.
 
 
-# Analysis
+# Results and Discussion
 
 ```{r}
-artprice100 <- fread("artprice100.csv")[, date := as_date(date)]
+#| label: initial-data-wrangling
+
+fr_inflation <- fread(
+    "data/valeurs_mensuelles.csv",
+    skip = 3,
+    header = TRUE,
+    drop = 3
+) |> data.table()
+setnames(
+    fr_inflation,
+    old = c("Période", "V2"),
+    new = c("date", "fr_hcpi")
+)
+fr_inflation <- fr_inflation[
+    grepl("^.*-01$", date),
+    .(
+        date = as_date(paste0(date, "-01")),
+        fr_hcpi
+    )
+]
+
+# Artprice100
+artprice100 <- fread("data/artprice100.csv")[, date := as_date(date)]
 setnames(artprice100, old = c("price"), new = c("Artprice100"))
 
+# MSCI World Net
 msci_world_net <- read_excel(
-    "990100 - MSCI World Index - FULL - 1998-12-31 - 2025-07-14 - Daily.xlsx",
+    "data/990100 - MSCI World Index - FULL - 1998-12-31 - 2025-07-14 - Daily.xlsx",
     range = "A6:B6929"
 ) |> data.table()
 msci_world_net[
@@ -93,17 +121,45 @@ msci_world_net[
     )
 ]
 
-# Merge
+# EUR/USD
+usd_eur <- fread(
+    "data/USD_EUR Historical Data.csv",
+    header = TRUE,
+    drop = c(3, 4, 5, 6, 7)
+) |> data.table()
+setnames(
+    usd_eur,
+    old = c("Date", "Price"),
+    new = c("date", "usd_eur")
+)
+usd_eur[, date := as_date(date, format = "%m/%d/%Y")]
+
+# Merge the 4 data sets
 dt <- merge(
     x = artprice100,
     y = msci_world_net,
     by = "date",
     all.x = TRUE
-)[
+) |>
+    merge(
+        y = fr_inflation,
+        by = "date",
+        all.x = TRUE
+    ) |>
+    merge(
+        y = usd_eur,
+        by = "date",
+        all.x = TRUE
+    )
+
+# Apply USD to EUR exchange rate & FR inflation correction
+# the intial units are lost but it doesn't matter for the analysis
+# "/ 100" is arbitrary and is just meant to reduce the values (uniformly, still no impact on the analysis)
+dt[
     ,
     `:=`(
-        msci_world_net_base_100 = (msci_world_net / first(msci_world_net) * 100) |>
-            round(2)
+        Artprice100 = Artprice100 * usd_eur * fr_hcpi / 100,
+        msci_world_net = msci_world_net * usd_eur * fr_hcpi / 100
     )
 ]
 ```
@@ -111,17 +167,36 @@ dt <- merge(
 
 ## Returns
 
-@fig-base-100-comp compares how the two indexes have evolved in the 25 years following 2000.
+@fig-base-100-comp compares how the two indexes have evolved in the 25 years following 2000. The art market index has a substantial lead. And this lead (i.e., the "Difference" line) has been growing rather linearly over the study period -- which signifies that the overperformance of the Artprice100 over the MSCI World Net was consistent over the examined time span.
 ```{r}
 #| label: fig-base-100-comp
-#| fig-cap: "Evolution of Artprice100 & MSCI World Net (Base 100) from 2000 to 2025"
+#| fig-cap: "Evolution of Artprice100 & MSCI World Net (Base 100) from 2000 to 2024"
 #| fig-pos: "H"
 
+# Add MSCI base 100 column
+dt[
+    ,
+    `:=`(
+        msci_world_net_base_100 = (msci_world_net / first(msci_world_net) * 100) |>
+            round(2),
+        Artprice100_base_100 = (Artprice100 / first(Artprice100) * 100) |>
+            round(2)
+    )
+][
+    ,
+    diff := Artprice100_base_100 - msci_world_net_base_100
+]
+
 ggplot(data = dt, aes(x = date)) +
-    geom_line(aes(y = Artprice100, color = "Artprice100")) +
+    geom_line(aes(y = Artprice100_base_100, color = "Artprice100")) +
     geom_line(aes(y = msci_world_net_base_100, color = "MSCI World Net")) +
+    geom_line(aes(y = diff, color = "Difference")) +
     scale_color_manual(
-        values = c("Artprice100" = "#1f77b4", "MSCI World Net" = "#ff7f0e")
+        values = c(
+            "Artprice100" = "#1f77b4",
+            "MSCI World Net" = "#ff7f0e",
+            "Difference" = "red"
+        )
     ) +
     labs(
         title = "",
@@ -137,6 +212,8 @@ ggplot(data = dt, aes(x = date)) +
 ```
 
 ```{r}
+#| label: cagr
+
 compute_cgar <- function(data, asset_colname) {
     dt[
         ,
@@ -158,12 +235,9 @@ artprice100_cagr <- compute_cgar(dt, "Artprice100")
 msci_world_net_cagr <- compute_cgar(dt, "msci_world_net")
 ```
 
-The [compound annual growth rate](https://www.investopedia.com/terms/c/cagr.asp) (CAGR) equals:
+The [compound annual growth rate](https://www.investopedia.com/terms/c/cagr.asp) (CAGR) equals `r artprice100_cagr`% for the Artprice100 and `r msci_world_net_cagr`% for the MSCI World Net. The difference between the two CAGRs -- `r artprice100_cagr - msci_world_net_cagr` percentage points -- summarizes the overperformance presented in @fig-base-100-comp.
 
-- `r artprice100_cagr`% for the Artprice100,
-- and `r msci_world_net_cagr`% for the MSCI World Net.
-
-@fig-yrly-ret shows the yearly returns of both indexes.
+@fig-yrly-ret shows the yearly returns of both indexes. We can see that years with a negative return on the MSCI World Net have a positive return on the Artprice100, except from 2002. Also, we note that the impact of the global financial crisis was reflected on the MSCI World Net in 2008 and only the following year on the Artprice100. Therefore, the Artpice100 presented some partial hedging properties relative to the global stock market. Except in 2002, the years with a negative Artprice100 return had a positive return on the MSCI World Net. Though, it would be an exageration to deem the two indexes countercyclical: in most years, the value of both indexes grew.
 ```{r}
 #| label: fig-yrly-ret
 #| fig-cap: "Yearly Returns of Artprice100 & MSCI World Net from 2000 to 2024"
@@ -210,18 +284,21 @@ ggplot(data = yearly_returns_dt, aes(x = factor(year), y = yearly_return, fill =
     )
 ```
 
-@fig-yrly-ret-distrib shows the distribution of yearly returns for each index.
+@fig-yrly-ret-distrib shows the distribution of yearly returns for each index. The range in which both indexes' returns evolved is similar (also showed in @fig-yrly-ret).
 ```{r}
 #| label: fig-yrly-ret-distrib
 #| fig-cap: "Distribution of the Yearly Returns of Artprice100 & MSCI World Net from 2000 to 2024"
 #| fig-pos: "H"
 
-yearly_returns_dt[, interval := cut(
-    yearly_return,
-    breaks = seq(-50, 50, by = 10),
-    labels = c("[-50;-40[", "[-40;-30[", "[-30;-20[", "[-20;-10[", "[-10;0[", "[0;10[", "[10;20[", "[20;30[", "[30;40[", "[40;50["),
-    include.lowest = TRUE
-)]
+yearly_returns_dt[
+    ,
+    interval := cut(
+        yearly_return,
+        breaks = seq(-50, 60, by = 10),
+        labels = c("[-50;-40[", "[-40;-30[", "[-30;-20[", "[-20;-10[", "[-10;0[", "[0;10[", "[10;20[", "[20;30[", "[30;40[", "[40;50[", "[50;60["),
+        include.lowest = TRUE
+    )
+]
 
 ggplot(yearly_returns_dt, aes(x = interval, fill = index)) +
     geom_bar(stat = "count", position = position_dodge(width = .5)) +
@@ -243,7 +320,7 @@ ggplot(yearly_returns_dt, aes(x = interval, fill = index)) +
 ```
 
 
-## Volatility
+## Volatility {#sec-vol}
 
 ```{r}
 compute_yearl_ret_sd <- function(data, asset_name) {
@@ -257,12 +334,39 @@ artprice100_yearly_ret_sd <- compute_yearl_ret_sd(yearly_returns_dt, "Artprice10
 msci_world_net_yearly_ret_sd <- compute_yearl_ret_sd(yearly_returns_dt, "MSCI World Net")
 ```
 
-The standard deviation of the yearly returns presented above equals:
+The standard deviation of the yearly returns presented above equals `r artprice100_yearly_ret_sd` percentage points for the Artprice100 and `r msci_world_net_yearly_ret_sd` percentage points for the MSCI World Net.
 
-- `r artprice100_yearly_ret_sd` percentage points for the Artprice100,
-- and `r msci_world_net_yearly_ret_sd` percentage points for the MSCI World Net.
+```{r}
+#| label: drawdown
 
-Note that the yearly valuation frequency of the Artprice100 hides an unknown amount of intra-year volatility.
+compute_max_dd <- function(data, asset_colname) {
+    data[
+        ,
+        (
+            (
+                1 - get(asset_colname) / cummax(get(asset_colname))
+            ) * 100
+        ) |> max() |> round(1)
+    ]
+}
+
+artprice100_max_dd <- compute_max_dd(dt, "Artprice100")
+msci_world_net_max_dd <- compute_max_dd(dt, "msci_world_net")
+```
+
+Unlike the standard deviations, the max drawdowns are substantially different: `r artprice100_max_dd`% for the Artprice100 and `r msci_world_net_max_dd`% for the MSCI World Net.
+
+Hence, both indexes had an equivalent level of overall volatility (standard deviation), although with more pronounced negative extremes (max drawdown) for the MSCI World Net. But note that the yearly valuation frequency of the Artprice100 hides an unknown amount of intra-year volatility.
+
+```{r}
+compute_sharpe_ratio <- function(return, sd) {
+    round(return / sd, 3)
+}
+artprice100_sharpe <- compute_sharpe_ratio(artprice100_cagr, artprice100_yearly_ret_sd)
+msci_world_net_sharpe <- compute_sharpe_ratio(msci_world_net_cagr, msci_world_net_yearly_ret_sd)
+```
+
+Using a null risk-free rate, the Sharpe ratio equals `r artprice100_sharpe` for the Artprice100 and `r msci_world_net_sharpe` for the MSCI World Net. That means that a unit of return from the blue chip art market came at a lower volatility cost than a unit of return from the MSCI World Net index. A higher risk-adjusted yield is a strong quality for the Artprice100.
 
 
 ## Correlation
@@ -295,7 +399,7 @@ ggplot(yearly_returns_dt_wide, aes(x = msci_world_net, y = Artprice100)) +
             y = Artprice100,
             linetype = paste0("Linear Regression Line\n(slope = ", round(lm_slope, 3), ")")
         ),
-        size = 1,
+        linewidth = 1,
         color = "red"
     ) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey") +
@@ -317,13 +421,48 @@ ggplot(yearly_returns_dt_wide, aes(x = msci_world_net, y = Artprice100)) +
 ```
 
 ```{r}
-spearson_cor_coef <- yearly_returns_dt_wide[
+pearson_cor_coef <- yearly_returns_dt_wide[
     ,
-    cor(Artprice100, msci_world_net)
+    cor(Artprice100, msci_world_net, method = "pearson")
 ] |> round(3)
 ```
 
-The Spearson correlation coefficient between the indexes is `r spearson_cor_coef`.
+The Pearson correlation coefficient between the indexes is `r pearson_cor_coef` indicating a positive yet weak correlation. This further shows that the two indexes are not countercyclical. Nonetheless, the weakness of the relationship means that the blue-chip art market may still be adequate to bring some amount of diversification and hedging to a stocks portfolio. 
+
+
+# Conclusions
+
+During the 2000-2024 period, the Artprice100 index presented a higher risk-adjusted yield than the MSCI World Net index. Its real CAGR was substantially higher while its volatility was somewhat lower. The Artprice100 provides a moderate amount of diversification relative to the stock market. If those past behaviors continue (knowing that nothing says that they will), the blue chip art market appears as an interesting addition to a stocks portfolio. Key metrics are summarized in @tbl-conc. Also, note that this analysis ignores market liquidity and atomicity considerations which are important factors to take into account for a relatively small market like the blue chip art market.
+
+```{r}
+#| label: tbl-conc
+#| tbl-cap: "Summary of the Comparison between the Artprice100 and the MSCI World Net (2000-2024)"
+#| tbl-pos: "H"
+
+data.table(
+    Metric = c(
+        "CAGR (%)",
+        "Yearly Return SD (percentage points)",
+        "Max Drawdown (%)",
+        "Sharpe Ratio",
+        "Pearson Correlation Coefficient"
+    ),
+    `Artprice100` = c(
+        artprice100_cagr,
+        artprice100_yearly_ret_sd,
+        artprice100_max_dd,
+        artprice100_sharpe,
+        pearson_cor_coef
+    ),
+    `MSCI World Net` = c(
+        msci_world_net_cagr,
+        msci_world_net_yearly_ret_sd,
+        msci_world_net_max_dd,
+        msci_world_net_sharpe,
+        pearson_cor_coef
+    )
+) |> kable()
+```
 
 
 # Appendix

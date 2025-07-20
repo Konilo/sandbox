@@ -1,0 +1,334 @@
+---
+title: "Artprice100©"
+author: "Konilo Zio"
+date: "`r format(Sys.time(), '%d/%m/%Y')`"
+toc: true
+format: 
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+execute:
+    echo: false
+---
+
+```{r setup}
+#| echo: false
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(ggplot2)
+library(lubridate)
+library(readxl)
+
+if (getwd() == "/app") {
+    setwd("sandbox/artprice100")
+}
+```
+
+
+# Introduction
+
+The [Artprice100](https://fr.artprice.com/artmarketinsight/artprice-lance-pour-la-finance-et-les-investisseurs-son-indice-artprice100-constitue-des-blue-chips-du-marche-de-lart) is a financial index designed to monitor prices on the "blue chip" art market i.e., the subsection of the art market composed of the highest valued and most recognized artworks, globally. It was created in 2018 by the French company [Artprice](Artprice) (founded in 1987). The main stated goal of such an index is to provide financial operators (e.g., private banks) with a tool allowing them to monitor the blue chip art market without the need for artistic expertise.
+
+The value of the Artprice100 was arbitrarily initialized at 100 on 2000-01-01 and is reevaluated once a year -- on the 1st of January. The evaluation process is as follows:
+
+- On 2000-01-01, 100$ were figuratively invested into the artowrks of the 100 top artists in terms of turnover (sum of the transaction costs) and in terms of sales regularity. The way sales regularity is measured is undisclosed as far as I know, but Artprice states that at least 10 "homogeneous" artworks must be sold each year for an artist to be included. These selection criteria are measured over the previous five years (1995-1999 included). The weight of each artists depends on its turnover.
+- The following year (on 2001-01-01), based on auction data, the worth of the investment made on the previous year can be updated. The resulting value is reinvested on the top 100 artists selected based on the same criteria, but looking at a new 5-year window (1996-2000).
+- And so on.
+
+This process is overseen by an expert committee. It is not clear to me whether the evaluations are completely objective or if the committee subjectively influences the index values, somehow.
+
+
+# Scope
+
+In this document, we will carry out a basic financial analysis of the Artprice100 to put in it perspective with conventional financial assets given that, as far as I know, Artprice100 is absent from trading platforms and exchanges (e.g., via ETFs).
+
+As a benchmark, conventional financial index, we will use the MSCI World index (USD). This a market-capitalization-weighted index covering publicly-traded companies in developed countries. We will use the "net" level of the index meaning that dividends are reinvested with taxes considered.
+
+Index values were retrived from [this](https://www.artprice.com/artmarketinsight/the-artprice100-index-of-blue-chip-artists-loses-8-3-in-2024) page for the Artprice100 and from [this](https://www.msci.com/indexes/index/990100) one for the MSCI World index.
+
+
+# Analysis
+
+```{r}
+artprice100 <- fread("artprice100.csv")[, date := as_date(date)]
+setnames(artprice100, old = c("price"), new = c("Artprice100"))
+
+msci_world_net <- read_excel(
+    "990100 - MSCI World Index - FULL - 1998-12-31 - 2025-07-14 - Daily.xlsx",
+    range = "A6:B6929"
+) |> data.table()
+msci_world_net[
+    ,
+    `:=`(
+        date = as_date(Date),
+        Date = NULL,
+        msci_world_net = `MSCI World Index`,
+        `MSCI World Index` = NULL
+    )
+]
+# fill missing XXXX-01-01
+msci_world_net <- merge(
+    msci_world_net,
+    data.table(
+        date = seq.Date(
+            as_date("2000-01-01"),
+            as_date("2025-01-01")
+        )
+    ),
+    by = "date",
+    all = TRUE
+)
+msci_world_net[
+    ,
+    msci_world_net := fcoalesce(
+        msci_world_net,
+        shift(msci_world_net, -1),
+        shift(msci_world_net, 1)
+    )
+]
+
+# Merge
+dt <- merge(
+    x = artprice100,
+    y = msci_world_net,
+    by = "date",
+    all.x = TRUE
+)[
+    ,
+    `:=`(
+        msci_world_net_base_100 = (msci_world_net / first(msci_world_net) * 100) |>
+            round(2)
+    )
+]
+```
+
+
+## Returns
+
+@fig-base-100-comp compares how the two indexes have evolved in the 25 years following 2000.
+```{r}
+#| label: fig-base-100-comp
+#| fig-cap: "Evolution of Artprice100 & MSCI World Net (Base 100) from 2000 to 2025"
+#| fig-pos: "H"
+
+ggplot(data = dt, aes(x = date)) +
+    geom_line(aes(y = Artprice100, color = "Artprice100")) +
+    geom_line(aes(y = msci_world_net_base_100, color = "MSCI World Net")) +
+    scale_color_manual(
+        values = c("Artprice100" = "#1f77b4", "MSCI World Net" = "#ff7f0e")
+    ) +
+    labs(
+        title = "",
+        x = "",
+        y = "Base 100 Value"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)
+    )
+```
+
+```{r}
+compute_cgar <- function(data, asset_colname) {
+    dt[
+        ,
+        (
+            (
+                (
+                    # initial price / final price
+                    last(get(asset_colname)) / first(get(asset_colname))
+                )^(
+                    1 /
+                        (last(year(date)) - first(year(date))) # 25 years
+                ) - 1
+            ) * 100
+        ) |> round(1)
+    ]
+}
+
+artprice100_cagr <- compute_cgar(dt, "Artprice100")
+msci_world_net_cagr <- compute_cgar(dt, "msci_world_net")
+```
+
+The [compound annual growth rate](https://www.investopedia.com/terms/c/cagr.asp) (CAGR) equals:
+
+- `r artprice100_cagr`% for the Artprice100,
+- and `r msci_world_net_cagr`% for the MSCI World Net.
+
+@fig-yrly-ret shows the yearly returns of both indexes.
+```{r}
+#| label: fig-yrly-ret
+#| fig-cap: "Yearly Returns of Artprice100 & MSCI World Net from 2000 to 2024"
+#| fig-pos: "H"
+
+yearly_returns_dt_wide <- dt[
+    ,
+    .(
+        year = year(date) - 1,
+        Artprice100 = round((Artprice100 / shift(Artprice100) - 1) * 100, 1),
+        msci_world_net = round((msci_world_net / shift(msci_world_net) - 1) * 100, 1)
+    ),
+] |>
+    na.omit() # Rm 1999
+
+yearly_returns_dt <- melt(
+    yearly_returns_dt_wide,
+    id.vars = c("year"),
+    measure.vars = c("Artprice100", "msci_world_net"),
+    variable.name = "index",
+    value.name = "yearly_return"
+)
+yearly_returns_dt[
+    index == "msci_world_net",
+    index := "MSCI World Net"
+]
+
+ggplot(data = yearly_returns_dt, aes(x = factor(year), y = yearly_return, fill = index)) +
+    geom_bar(stat = "identity", position = position_dodge(width = .5)) +
+    scale_fill_manual(
+        values = c("Artprice100" = "#1f77b4", "MSCI World Net" = "#ff7f0e")
+    ) +
+    labs(
+        title = "",
+        x = "",
+        y = "Yearly Return (%)"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+```
+
+@fig-yrly-ret-distrib shows the distribution of yearly returns for each index.
+```{r}
+#| label: fig-yrly-ret-distrib
+#| fig-cap: "Distribution of the Yearly Returns of Artprice100 & MSCI World Net from 2000 to 2024"
+#| fig-pos: "H"
+
+yearly_returns_dt[, interval := cut(
+    yearly_return,
+    breaks = seq(-50, 50, by = 10),
+    labels = c("[-50;-40[", "[-40;-30[", "[-30;-20[", "[-20;-10[", "[-10;0[", "[0;10[", "[10;20[", "[20;30[", "[30;40[", "[40;50["),
+    include.lowest = TRUE
+)]
+
+ggplot(yearly_returns_dt, aes(x = interval, fill = index)) +
+    geom_bar(stat = "count", position = position_dodge(width = .5)) +
+    scale_fill_manual(
+        values = c("Artprice100" = "#1f77b4", "MSCI World Net" = "#ff7f0e")
+    ) +
+    labs(
+        title = "",
+        x = "Yearly Return (%)",
+        y = "Count of Years"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+```
+
+
+## Volatility
+
+```{r}
+compute_yearl_ret_sd <- function(data, asset_name) {
+    data[
+        index == asset_name,
+        sd(yearly_return) |> round(1)
+    ]
+}
+
+artprice100_yearly_ret_sd <- compute_yearl_ret_sd(yearly_returns_dt, "Artprice100")
+msci_world_net_yearly_ret_sd <- compute_yearl_ret_sd(yearly_returns_dt, "MSCI World Net")
+```
+
+The standard deviation of the yearly returns presented above equals:
+
+- `r artprice100_yearly_ret_sd` percentage points for the Artprice100,
+- and `r msci_world_net_yearly_ret_sd` percentage points for the MSCI World Net.
+
+Note that the yearly valuation frequency of the Artprice100 hides an unknown amount of intra-year volatility.
+
+
+## Correlation
+
+@fig-cor presents the linear regression between the two indexes.
+```{r}
+#| label: fig-cor
+#| fig-cap: "Regression of the Yearly Returns of Artprice100 & MSCI World Net from 2000 to 2024"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 5.5
+
+lm_coefs <- lm(Artprice100 ~ msci_world_net, data = yearly_returns_dt_wide) |>
+    coef()
+lm_slope <- lm_coefs["msci_world_net"]
+lm_intercept <- lm_coefs["(Intercept)"]
+
+# Wrangling to display the regression line and have it labeled in the legend
+regression_line <- data.frame(
+    msci_world_net = c(-40, 40),
+    Artprice100 = lm_slope * c(-40, 40) + lm_intercept
+)
+
+ggplot(yearly_returns_dt_wide, aes(x = msci_world_net, y = Artprice100)) +
+    geom_point(size = 2) +
+    geom_line(
+        data = regression_line,
+        aes(
+            x = msci_world_net,
+            y = Artprice100,
+            linetype = paste0("Linear Regression Line\n(slope = ", round(lm_slope, 3), ")")
+        ),
+        size = 1,
+        color = "red"
+    ) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey") +
+    geom_hline(yintercept = 0, linewidth = 0.5) +
+    geom_vline(xintercept = 0, linewidth = 0.5) +
+    coord_fixed(ratio = 1, xlim = c(-40, 40)) +
+    labs(
+        title = "",
+        x = "MSCI World Net, Yearly Return (%)",
+        y = "Artprice100, Yearly Return (%)",
+        linetype = "Legend"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)
+    )
+```
+
+```{r}
+spearson_cor_coef <- yearly_returns_dt_wide[
+    ,
+    cor(Artprice100, msci_world_net)
+] |> round(3)
+```
+
+The Spearson correlation coefficient between the indexes is `r spearson_cor_coef`.
+
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+print(sessionInfo(), locale = FALSE)
+```

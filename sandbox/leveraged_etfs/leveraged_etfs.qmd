@@ -1,0 +1,143 @@
+---
+title: "Should I Include Leveraged ETFs In My Portfolio?"
+author: "Konilo Zio"
+date: "`r format(Sys.time(), '%d/%m/%Y')`"
+toc: true
+format: 
+  html:
+    code-fold: true
+    number-sections: true
+    toc-expand: true
+    toc-depth: 5
+    code-tools: true
+---
+
+```{r}
+#| label: setup
+#| echo: false
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(quantmod)
+library(plotly)
+library(ggplot2)
+library(readxl)
+
+if (getwd() == "/app") {
+    setwd("sandbox/leveraged_etfs")
+}
+```
+
+# Introduction
+
+In finance, leveraging means obtaining an exposition to an asset that surpasses one's stake. For instance, with a x2 (or "2:1") leveraged ETF (LETF), an investment of 1 euro grants 2-euro worth of exposition to the underlying asset of the LETF.
+
+The [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd) showed that adopting a leveraged position on stocks may be interesting for retirement planning in a first section of one's career. The goal of such leveraging is to increase the expected returns given that, at that stage of life, one's total portfolio is overwhelmingly dominated by bond-like assets (futures savings from wages) thus causing one's exposition to risky assets to be far below what one's level of risk aversion (or utility function) recommends.
+
+Fundamentally, several methods make this possible, of which borrowing (e.g., mortgage loans, margin loans) is the most obvious one. But those methods also include more sophisticated schemes involving stock options (namely box spreads on future contracts).
+
+In this study, we wil explore the intricacies of one LETFs -- [Amundi ETF Leveraged MSCI USA Daily UCITS ETF - EUR](https://www.amundietf.fr/fr/professionnels/produits/equity/amundi-etf-leveraged-msci-usa-daily-ucits-etf-eur/fr0010755611), whose ticker is "CL2" -- which is designed to provide, at the scale of each trading day, a x2, long exposition to the performance of the [MSCI USA index](https://www.msci.com/indexes/index/984000) (Net Return).
+
+- This LETF uses short-term, interbank borrowing to turn an investor's 1 euro stake into 2 euros of exposition. This gymnastic is solely managed by the fund.
+- The fund is eligible to the [Plan Epargne en Action (PEA)](https://www.economie.gouv.fr/particuliers/gerer-mon-argent/gerer-mon-budget-et-mon-epargne/quest-ce-que-le-plan-depargne-en) even though the index it tracks is entirely focused on the US. That is because it uses a *total return swap* between (i) a set of eligible assets (assets based in the European Union) it owns and (ii) the actual set of stocks in the MSCI USA Index owned by another company.
+- And CL2 also happens to be capitalizing which grants the investor full control on their fiscal events.
+
+These characteristics make CL2 and similar LETFs the easiest solution to gain leverage on stocks in France.
+
+Nonetheless, this form of leverage implies certain additional risk factors compared to the equivalent, but unleveraged, scenario (namely a classic long, unleveraged, buy-and-hold strategy on [ESE](https://www.bnpparibas-am.com/fr-fr/individuel/fundsheet/equity/bnp-paribas-easy-sp-500-ucits-etf-eur-c-c-2-fr0011550185?tab=overview) -- a popular ETF tracking the S&P 500 index which is similar to the MSCI USA index):
+
+- the cost of the borrowing carried out by the fund evolves unpredictably over time and has a direct, negative impact on the perfomance of the LETF;
+- the daily rebalancing (daily reset of the leverage) increases the negative impact of the underlying index's volatility on the performance of the LETF -- this negative impact is called beta slippage. LETFs with a daily rebalancing are only marketed for detention periods of 1 trading day at most because funds want to discourage investors from exposing themselves to the daily rebalancings.
+
+Those weaknesses can make LETFs greatly underperform equivalent unleveraged ETFs (e.g., CL2 vs. ESE) if borrowing costs and/or volatility are high.
+
+The choice of an invest essentially rests on its expected risk-adjusted return or, in other words, on the amount of return it will provide for each unit of volatility (risk). Compared to unleveraged ETFs like ESE, the risk-adjusted return of LETFs like CL2 are more vulnerable to the underlying index's volatility and require on borrowing costs not being too high in order (while unleveraged ETFs are not directly affected by interest rates). Hence, while LETFs are easy to use, the choice to invest in them is much more complex. That is what we will explore herein.
+
+```{r}
+#| label: data-loading
+
+# MSCI USA (USD, Net)
+# https://www.msci.com/indexes/index/984000
+msci_usa <- read_excel(
+    "data/984000 - MSCI USA Index - FULL - 1998-12-31 - 2025-07-25 - Daily.xlsx",
+    range = "A6:B6938"
+) |> data.table()
+setnames(msci_usa, old = c("Date", "MSCI USA Index"), new = c("date", "msci_usa"))
+
+# https://www.boursorama.com/bourse/taux/cours/1xESTER/
+ester <- read.table(
+    "data/STR_2025-07-26.txt",
+    header = TRUE,
+    sep = "\t",
+    stringsAsFactors = FALSE
+) |> data.table()
+ester <- ester[, .(date, clot)]
+setnames(ester, old = "clot", new = "ester")
+
+# EUR/USD
+eur_usd <- getSymbols(
+    "EURUSD=X",
+    src = "yahoo",
+    auto.assign = FALSE
+) |> data.table(keep.rownames = TRUE)
+stopifnot(eur_usd[`EURUSD=X.Close` != `EURUSD=X.Adjusted`, .N == 0])
+eur_usd <- eur_usd[, .(index, `EURUSD=X.Close`)]
+setnames(eur_usd, old = c("index", "EURUSD=X.Close"), new = c("date", "eur_usd"))
+
+# CL2
+cl2 <- getSymbols(
+    "CL2.PA",
+    src = "yahoo",
+    auto.assign = FALSE
+) |> data.table(keep.rownames = TRUE)
+stopifnot(cl2[`CL2.PA.Close` != `CL2.PA.Adjusted`, .N == 0])
+cl2 <- cl2[, .(index, `CL2.PA.Close`)]
+setnames(cl2, old = c("index", "CL2.PA.Close"), new = c("date", "cl2"))
+```
+
+
+# Understanding beta slippage
+
+```{r}
+
+```
+
+
+# Borrowing cost
+
+```{r}
+
+```
+
+
+# Reconstructing the past price action of CL2
+
+```{r}
+
+```
+
+
+# Forward simulations of CL2
+
+```{r}
+
+```
+
+
+# Conclusions
+
+Maybe.
+
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+#| label: appendix
+
+print(sessionInfo(), locale = FALSE)
+```

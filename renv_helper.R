@@ -27,6 +27,8 @@ install.packages(
     repos = NULL,
     type = "source"
 )
+renv::install("remotes", prompt = FALSE)
+remotes::install_github("nx10/httpgd")
 
 # Showing renv that those packages are needed
 library(jsonlite)

@@ -29,8 +29,13 @@ library(readxl)
 library(lubridate)
 library(patchwork)
 
+# Runs when executing R interactively (because app/ is the workdir),
+# but not when rendering the qmd (because the qmd's dir is the workdir in that case)
 if (getwd() == "/app") {
     setwd("sandbox/leveraged_etfs")
+    library(httpgd)
+    httpgd::hgd()
+    # Plots will be displayed via a web page whose URL will be printed be the function above
 }
 ```
 
@@ -170,10 +175,6 @@ stopifnot(dt[is.na(ester) | is.na(usd_eur), .N == 0])
 
 # Understanding beta slippage
 
-intuitive
-graphic
-mathemartic
-
 ```{r}
 plot_leverage_scenario <- function(index_timeseries) {
     init_value <- 100
@@ -199,39 +200,66 @@ plot_leverage_scenario <- function(index_timeseries) {
     plot_dt[
         ,
         `:=`(
-            letf_x2_daily_return = shift(letf_x2, fill = init_value) / letf_x2 - 1,
-            letf_x3_daily_return = shift(letf_x3, fill = init_value) / letf_x3 - 1
+            letf_x2_daily_return = letf_x2 / shift(letf_x2, fill = init_value) - 1,
+            letf_x3_daily_return = letf_x3 / shift(letf_x3, fill = init_value) - 1
         )
     ]
-
-    returns <- ggplot(plot_dt, aes(x = trading_day)) +
-        geom_bar(aes(y = index_daily_return, fill = "Index Daily Return"), stat = "identity", alpha = 0.7) +
-        geom_bar(aes(y = letf_x2_daily_return, fill = "x2 LETF Daily Return"), stat = "identity", alpha = 0.7) +
-        geom_bar(aes(y = letf_x3_daily_return, fill = "x3 LETF Daily Return"), stat = "identity", alpha = 0.7) +
-        scale_fill_manual(values = c("Index Daily Return" = "#1f77b4", "x2 LETF Daily Return" = "#ff7f0e", "x3 LETF Daily Return" = "#ff0e0eff")) +
-        labs(
-            title = "Daily Returns",
-            x = "Trading Day",
-            y = "Daily Return",
-            fill = "Daily Returns"
-        ) +
-        theme_minimal() +
-        theme(
-            legend.position = "bottom",
-            legend.title = element_text(size = 10),
-            legend.text = element_text(size = 8)
-        )
 
     prices <- ggplot(plot_dt, aes(x = trading_day)) +
         geom_line(aes(y = index, color = "Index"), linewidth = 1) +
         geom_line(aes(y = letf_x2, color = "x2 LETF"), linewidth = 1) +
         geom_line(aes(y = letf_x3, color = "x3 LETF"), linewidth = 1) +
-        scale_color_manual(values = c("Index" = "#1f77b4", "x2 LETF" = "#ff7f0e", "x3 LETF" = "#ff0e0eff")) +
+        geom_point(aes(y = index, color = "Index")) +
+        geom_point(aes(y = letf_x2, color = "x2 LETF")) +
+        geom_point(aes(y = letf_x3, color = "x3 LETF")) +
+        scale_color_manual(
+            values = c(
+                "Index" = "#1f77b4",
+                "x2 LETF" = "#ff7f0e",
+                "x3 LETF" = "#ff0e0eff"
+            )
+        ) +
+        scale_x_continuous(
+            breaks = seq(plot_dt[, min(trading_day)], plot_dt[, max(trading_day)])
+        ) +
         labs(
             title = "Prices",
-            x = "Trading Day",
+            x = element_blank(),
             y = "Price",
-            color = "Prices"
+            color = element_blank()
+        ) +
+        theme_minimal() +
+        theme(legend.position = "no")
+
+    returns <- plot_dt |>
+        melt(
+            id.vars = "trading_day",
+            measure.vars = c("index_daily_return", "letf_x2_daily_return", "letf_x3_daily_return"),
+            variable.name = "asset",
+            value.name = "daily_return"
+        ) |>
+        ggplot(aes(x = trading_day, y = daily_return * 100, fill = asset)) +
+        geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+        scale_fill_manual(
+            values = c(
+                "index_daily_return" = "#1f77b4",
+                "letf_x2_daily_return" = "#ff7f0e",
+                "letf_x3_daily_return" = "#ff0e0eff"
+            ),
+            labels = c(
+                "index_daily_return" = "Index",
+                "letf_x2_daily_return" = "x2 LETF",
+                "letf_x3_daily_return" = "x3 LETF"
+            )
+        ) +
+        scale_x_continuous(
+            breaks = seq(plot_dt[, min(trading_day)], plot_dt[, max(trading_day)])
+        ) +
+        labs(
+            title = "Daily Returns",
+            x = "Trading Day",
+            y = "Daily Return (%)",
+            fill = element_blank()
         ) +
         theme_minimal() +
         theme(
@@ -240,21 +268,13 @@ plot_leverage_scenario <- function(index_timeseries) {
             legend.text = element_text(size = 8)
         )
 
-    prices / returns
+    prices / returns +
+        plot_layout(heights = c(2, 1))
 }
 ```
 
-```{r}
-#| label: fig-lev-sce-sid-sta
-#| fig-cap: "To name"
-#| fig-pos: "H"
-#| fig-width: 5.5
-#| fig-height: 5.5
-
-# +- 10% from 100
-sideways_volatile <- c(100, rep(c(110, 90), 4))
-plot_leverage_scenario(sideways_volatile)
-```
+@fig-lev-sce-up-sta, steady, 2% daily growth of the index. Constant returns which simply correspond to the index growth times 2 or 3.
+In such a case with low volatility, the performance of LETFs strictly equals the performance of the index times the amount of leverage. When that trend goes upward, long LETFs (i.e., LETFs whose leverage is positive) are very efficient in terms risk-adjusted yield **can I say that?**.
 
 ```{r}
 #| label: fig-lev-sce-up-sta
@@ -263,10 +283,41 @@ plot_leverage_scenario(sideways_volatile)
 #| fig-width: 5.5
 #| fig-height: 5.5
 
-# steady 5%
-upward_stable <- c(100, cumprod(rep(.05, 8) + 1) * 100)
+upward_stable <- c(100, cumprod(rep(.02, 8) + 1) * 100)
 plot_leverage_scenario(upward_stable)
+```
 
+But when volatility is introduced, a new phenomenon appears. Let's take an example.
+
+- index, market agrees on $100 but with some fluctuations around that valuation.
+- 10% drop means $100 down to $90
+- to go back to the initial $100, we need a 11.1% increase
+
+with leverage:
+
+- 100 -20% gives 80%
+- 80 +22.2% gives $97.78
+
+I.e. the multplicative factor that was enough to bring the index back to $100 (1.111), when multiplied by two (1.222), is not enough to bring back the 2x LETF back to $100. That's because the LETF lost more worth and, after the 10%/20% drop, one percent of the index is worth .9 cents while 1% of the 2x LETF is worth only .8 cents.
+
+@fig-lev-sce-sid-vol, index value goes sideways but with volatility above and below its 100 center point. Don't stay centered on 100, though. This drift is beta slippage.
+```{r}
+#| label: fig-lev-sce-sid-vol
+#| fig-cap: "To name"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 5.5
+
+# intuitive
+# graphic
+# mathemartic
+
+sideways_volatile <- c(100, rep(c(102, 98), 7))
+# index_timeseries <- sideways_volatile
+plot_leverage_scenario(sideways_volatile)
+```
+
+```{r}
 # upward_volatile <- c(100, rep(c(110, 90), 10))
 # plot_leverage_scenario(upward_volatile)
 

@@ -1,15 +1,15 @@
 ---
 title: "Should I Include Leveraged ETFs In My Portfolio?"
 author: "Konilo Zio"
-date: "`r format(Sys.time(), '%d/%m/%Y')`"
+date: "`r Sys.time()`"
 toc: true
 format: 
-  html:
-    code-fold: true
+  pdf:
+    toc: true
     number-sections: true
-    toc-expand: true
-    toc-depth: 5
-    code-tools: true
+    colorlinks: true
+execute:
+    echo: false
 ---
 
 ```{r}
@@ -26,17 +26,20 @@ library(quantmod)
 library(plotly)
 library(ggplot2)
 library(readxl)
+library(lubridate)
+library(patchwork)
 
 if (getwd() == "/app") {
     setwd("sandbox/leveraged_etfs")
 }
 ```
 
+
 # Introduction
 
 In finance, leveraging means obtaining an exposition to an asset that surpasses one's stake. For instance, with a x2 (or "2:1") leveraged ETF (LETF), an investment of 1 euro grants 2-euro worth of exposition to the underlying asset of the LETF.
 
-The [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd) showed that adopting a leveraged position on stocks may be interesting for retirement planning in a first section of one's career. The goal of such leveraging is to increase the expected returns given that, at that stage of life, one's total portfolio is overwhelmingly dominated by bond-like assets (futures savings from wages) thus causing one's exposition to risky assets to be far below what one's level of risk aversion (or utility function) recommends.
+The [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd) study showed that adopting a leveraged position on stocks may be interesting for retirement planning in a first section of one's career. The goal of such leveraging is to increase the expected returns given that, at that stage of life, one's total portfolio is overwhelmingly dominated by bond-like assets (futures savings from wages) thus causing one's exposition to risky assets to be far below what one's level of risk aversion (or utility function) recommends.
 
 Fundamentally, several methods make this possible, of which borrowing (e.g., mortgage loans, margin loans) is the most obvious one. But those methods also include more sophisticated schemes involving stock options (namely box spreads on future contracts).
 
@@ -55,10 +58,24 @@ Nonetheless, this form of leverage implies certain additional risk factors compa
 
 Those weaknesses can make LETFs greatly underperform equivalent unleveraged ETFs (e.g., CL2 vs. ESE) if borrowing costs and/or volatility are high.
 
-The choice of an invest essentially rests on its expected risk-adjusted return or, in other words, on the amount of return it will provide for each unit of volatility (risk). Compared to unleveraged ETFs like ESE, the risk-adjusted return of LETFs like CL2 are more vulnerable to the underlying index's volatility and require on borrowing costs not being too high in order (while unleveraged ETFs are not directly affected by interest rates). Hence, while LETFs are easy to use, the choice to invest in them is much more complex. That is what we will explore herein.
+The choice of an invest essentially rests on its expected risk-adjusted return or, in other words, on the amount of return it will provide for each unit of volatility (risk). Compared to unleveraged ETFs like ESE, the risk-adjusted return of LETFs like CL2 are more vulnerable to the underlying index's volatility and require borrowing costs not being too high (while unleveraged ETFs are not directly affected by interest rates). Hence, while LETFs are easy to *use*, the *choice to invest* in them is much more complex. That is what we will explore herein.
+
+
+# Materials
+
+The time series used in this study are listed in @tbl-materials.
+
+| Time series         | Source                                                |
+|:--------------------|:------------------------------------------------------|
+| MSCI USA index (Net, USD) | [https://www.msci.com/indexes/index/984000](https://www.msci.com/indexes/index/984000)             |
+| Euro Short-Term Rate (ESTER)               | [https://www.boursorama.com/bourse/taux/cours/1xESTER/](https://www.boursorama.com/bourse/taux/cours/1xESTER/) |
+| USD/EUR             | [https://finance.yahoo.com/quote/USDEUR=X/](https://finance.yahoo.com/quote/USDEUR=X/)             |
+| CL2                 | [https://finance.yahoo.com/quote/CL2.PA/](https://finance.yahoo.com/quote/CL2.PA/)               |
+: Metarials of the study {#tbl-materials}
 
 ```{r}
 #| label: data-loading
+#| warning: false
 
 # MSCI USA (USD, Net)
 # https://www.msci.com/indexes/index/984000
@@ -67,6 +84,7 @@ msci_usa <- read_excel(
     range = "A6:B6938"
 ) |> data.table()
 setnames(msci_usa, old = c("Date", "MSCI USA Index"), new = c("date", "msci_usa"))
+msci_usa[, date := as_date(date)]
 
 # https://www.boursorama.com/bourse/taux/cours/1xESTER/
 ester <- read.table(
@@ -77,16 +95,18 @@ ester <- read.table(
 ) |> data.table()
 ester <- ester[, .(date, clot)]
 setnames(ester, old = "clot", new = "ester")
+ester[, date := as_date(substr(date, 1, 10), format = "%d/%m/%Y")]
 
 # EUR/USD
-eur_usd <- getSymbols(
-    "EURUSD=X",
+usd_eur <- getSymbols(
+    "USDEUR=X",
     src = "yahoo",
     auto.assign = FALSE
 ) |> data.table(keep.rownames = TRUE)
-stopifnot(eur_usd[`EURUSD=X.Close` != `EURUSD=X.Adjusted`, .N == 0])
-eur_usd <- eur_usd[, .(index, `EURUSD=X.Close`)]
-setnames(eur_usd, old = c("index", "EURUSD=X.Close"), new = c("date", "eur_usd"))
+stopifnot(usd_eur[`USDEUR=X.Close` != `USDEUR=X.Adjusted`, .N == 0])
+usd_eur <- usd_eur[, .(index, `USDEUR=X.Close`)]
+setnames(usd_eur, old = c("index", "USDEUR=X.Close"), new = c("date", "usd_eur"))
+usd_eur[, date := as_date(date)]
 
 # CL2
 cl2 <- getSymbols(
@@ -94,16 +114,167 @@ cl2 <- getSymbols(
     src = "yahoo",
     auto.assign = FALSE
 ) |> data.table(keep.rownames = TRUE)
-stopifnot(cl2[`CL2.PA.Close` != `CL2.PA.Adjusted`, .N == 0])
+stopifnot(cl2[`CL2.PA.Close` != `CL2.PA.Adjusted`, .N == 0]) # Stop if close != adjusted
+stopifnot(!cl2[, any(is.na(`CL2.PA.Close`))]) # Stop if there are missing values
 cl2 <- cl2[, .(index, `CL2.PA.Close`)]
 setnames(cl2, old = c("index", "CL2.PA.Close"), new = c("date", "cl2"))
+cl2[, date := as_date(date)]
+```
+
+```{r}
+#| label: data-merging
+
+# Full join
+dt <- Reduce(
+    function(x, y) merge(x, y, by = "date", all = TRUE),
+    list(msci_usa, ester, usd_eur, cl2)
+)
+
+# We'll want to reconstruct CL2 which is based on MSCI USA
+# Only days during which CL2 or MSCI USA was traded/evolved are kept
+dt <- dt[!is.na(msci_usa) | !is.na(cl2)]
+
+# Among those days, keep the period corresponding to the intersection between the ranges of the 4 price time series
+min_date <- max(
+    dt[!is.na(msci_usa), min(date)],
+    dt[!is.na(cl2), min(date)],
+    dt[!is.na(ester), min(date)],
+    dt[!is.na(usd_eur), min(date)]
+)
+max_date <- min(
+    dt[!is.na(msci_usa), max(date)],
+    dt[!is.na(cl2), max(date)],
+    dt[!is.na(ester), max(date)],
+    dt[!is.na(usd_eur), max(date)]
+)
+dt <- dt[date %between% c(min_date, max_date)]
+# This different from replacing the full join with an inner one because I want to keep the rows with NAs within the min_date-max_date period
+
+# Among the days where CL2 or MSCI USA changed, do some have a missing USD/EUR or ESTER?
+# dt[is.na(ester) | is.na(usd_eur), .N, paste(year(date), month(date))]
+# dt[, weekday := weekdays(date)]
+# dt[!complete.cases(dt), .N, weekday]
+# dt[is.na(usd_eur), .N, weekday]
+# dt[is.na(ester), .N, weekday]
+# Yes
+
+# Those missing values are filled with last observation carried forward (LOCF)
+setnafill(dt, type = "locf", cols = c("usd_eur", "ester"))
+stopifnot(dt[is.na(ester) | is.na(usd_eur), .N == 0])
+
+# The only remaining rows with NAs are cases where CL2 was not traded but MSCI USA (and USD/EUR & ESTER) have values
+# This will be dealt with further down. This intial merging process ends here.
+# dt[!complete.cases(dt), ]
 ```
 
 
 # Understanding beta slippage
 
-```{r}
+intuitive
+graphic
+mathemartic
 
+```{r}
+plot_leverage_scenario <- function(index_timeseries) {
+    init_value <- 100
+    stopifnot(index_timeseries[1] == init_value)
+    plot_dt <- data.table(
+        trading_day = 1:length(index_timeseries),
+        index = index_timeseries
+    )
+
+    plot_dt[
+        ,
+        index_daily_return := index / shift(index, fill = init_value) - 1
+    ]
+
+    plot_dt[
+        ,
+        `:=`(
+            letf_x2 = init_value * cumprod(index_daily_return * 2 + 1),
+            letf_x3 = init_value * cumprod(index_daily_return * 3 + 1)
+        )
+    ]
+
+    plot_dt[
+        ,
+        `:=`(
+            letf_x2_daily_return = shift(letf_x2, fill = init_value) / letf_x2 - 1,
+            letf_x3_daily_return = shift(letf_x3, fill = init_value) / letf_x3 - 1
+        )
+    ]
+
+    returns <- ggplot(plot_dt, aes(x = trading_day)) +
+        geom_bar(aes(y = index_daily_return, fill = "Index Daily Return"), stat = "identity", alpha = 0.7) +
+        geom_bar(aes(y = letf_x2_daily_return, fill = "x2 LETF Daily Return"), stat = "identity", alpha = 0.7) +
+        geom_bar(aes(y = letf_x3_daily_return, fill = "x3 LETF Daily Return"), stat = "identity", alpha = 0.7) +
+        scale_fill_manual(values = c("Index Daily Return" = "#1f77b4", "x2 LETF Daily Return" = "#ff7f0e", "x3 LETF Daily Return" = "#ff0e0eff")) +
+        labs(
+            title = "Daily Returns",
+            x = "Trading Day",
+            y = "Daily Return",
+            fill = "Daily Returns"
+        ) +
+        theme_minimal() +
+        theme(
+            legend.position = "bottom",
+            legend.title = element_text(size = 10),
+            legend.text = element_text(size = 8)
+        )
+
+    prices <- ggplot(plot_dt, aes(x = trading_day)) +
+        geom_line(aes(y = index, color = "Index"), linewidth = 1) +
+        geom_line(aes(y = letf_x2, color = "x2 LETF"), linewidth = 1) +
+        geom_line(aes(y = letf_x3, color = "x3 LETF"), linewidth = 1) +
+        scale_color_manual(values = c("Index" = "#1f77b4", "x2 LETF" = "#ff7f0e", "x3 LETF" = "#ff0e0eff")) +
+        labs(
+            title = "Prices",
+            x = "Trading Day",
+            y = "Price",
+            color = "Prices"
+        ) +
+        theme_minimal() +
+        theme(
+            legend.position = "bottom",
+            legend.title = element_text(size = 10),
+            legend.text = element_text(size = 8)
+        )
+
+    prices / returns
+}
+```
+
+```{r}
+#| label: fig-lev-sce-sid-sta
+#| fig-cap: "To name"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 5.5
+
+# +- 10% from 100
+sideways_volatile <- c(100, rep(c(110, 90), 4))
+plot_leverage_scenario(sideways_volatile)
+```
+
+```{r}
+#| label: fig-lev-sce-up-sta
+#| fig-cap: "To name"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 5.5
+
+# steady 5%
+upward_stable <- c(100, cumprod(rep(.05, 8) + 1) * 100)
+plot_leverage_scenario(upward_stable)
+
+# upward_volatile <- c(100, rep(c(110, 90), 10))
+# plot_leverage_scenario(upward_volatile)
+
+# downard_stabe <- c(100, rep(c(110, 90), 10))
+# plot_leverage_scenario(downard_stabe)
+
+# downard_volatile <- c(100, rep(c(110, 90), 10))
+# plot_leverage_scenario(downard_volatile)
 ```
 
 

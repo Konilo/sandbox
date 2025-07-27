@@ -1,7 +1,7 @@
 ---
 title: "Lifecycle Investing"
 author: "Konilo Zio"
-date: "`r format(Sys.time(), '%d/%m/%Y')`"
+date: "`r Sys.time()`"
 toc: true
 format: 
   html:

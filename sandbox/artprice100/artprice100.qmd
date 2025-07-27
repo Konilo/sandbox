@@ -121,7 +121,7 @@ msci_world_net[
     )
 ]
 
-# EUR/USD
+# USD/EUR
 usd_eur <- fread(
     "data/USD_EUR Historical Data.csv",
     header = TRUE,

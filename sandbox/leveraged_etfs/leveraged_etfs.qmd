@@ -263,14 +263,18 @@ plot_leverage_scenario <- function(
         "letf_x3_never_daily_return" = "x3 LETF without Rebalancing"
     )
 
-    # Create consistent x-axis breaks for both plots
+    # Ensure integer tick marks and alignment of both x-axis
     x_breaks <- seq(plot_dt[, min(trading_day)], plot_dt[, max(trading_day)])
+    x_limits <- c(plot_dt[, min(trading_day)-.5], plot_dt[, max(trading_day)+.5])
 
     prices <- ggplot(price_data, aes(x = trading_day, y = price, color = series)) +
         geom_line(linewidth = 1) +
         geom_point() +
         scale_color_manual(values = color_map_prices[show_series]) +
-        scale_x_continuous(breaks = x_breaks) +
+        scale_x_continuous(
+            breaks = x_breaks,
+            limits = x_limits
+        ) +
         labs(
             title = "Prices",
             x = element_blank(),
@@ -286,7 +290,10 @@ plot_leverage_scenario <- function(
             values = color_map_returns[return_vars],
             labels = label_map[return_vars]
         ) +
-        scale_x_continuous(breaks = x_breaks) +
+        scale_x_continuous(
+            breaks = x_breaks,
+            limits = x_limits
+        ) +
         labs(
             title = "Daily Returns",
             x = "Trading Day",

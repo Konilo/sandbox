@@ -59,7 +59,7 @@ These characteristics make CL2 and similar LETFs the easiest solution to gain le
 Nonetheless, this form of leverage implies certain additional risk factors compared to the equivalent, but unleveraged, scenario (namely a classic long, unleveraged, buy-and-hold strategy on [ESE](https://www.bnpparibas-am.com/fr-fr/individuel/fundsheet/equity/bnp-paribas-easy-sp-500-ucits-etf-eur-c-c-2-fr0011550185?tab=overview) -- a popular ETF tracking the S&P 500 index which is similar to the MSCI USA index):
 
 - the cost of the borrowing carried out by the fund evolves unpredictably over time and has a direct, negative impact on the perfomance of the LETF;
-- the daily rebalancing (daily reset of the leverage) increases the negative impact of the underlying index's volatility on the performance of the LETF -- this negative impact is called beta slippage. LETFs with a daily rebalancing are only marketed for detention periods of 1 trading day at most because funds want to discourage investors from exposing themselves to the daily rebalancings.
+- the daily rebalancing (daily reset of the leverage) increases the negative impact of the underlying index's volatility on the performance of the LETF -- this negative impact is called volatility drag. LETFs with a daily rebalancing are only marketed for detention periods of 1 trading day at most because funds want to discourage investors from exposing themselves to the daily rebalancings.
 
 Those weaknesses can make LETFs greatly underperform equivalent unleveraged ETFs (e.g., CL2 vs. ESE) if borrowing costs and/or volatility are high.
 
@@ -173,10 +173,16 @@ stopifnot(dt[is.na(ester) | is.na(usd_eur), .N == 0])
 ```
 
 
-# Understanding beta slippage
+# Understanding volatility drag
 
 ```{r}
-plot_leverage_scenario <- function(index_timeseries) {
+plot_leverage_scenario <- function(
+    index_timeseries,
+    show_series = c("index", "letf_x2_daily", "letf_x3_daily", "letf_x2_never", "letf_x3_never")
+) {
+    valid_series <- c("index", "letf_x2_daily", "letf_x3_daily", "letf_x2_never", "letf_x3_never")
+    stopifnot(all(show_series %in% valid_series))
+
     init_value <- 100
     stopifnot(index_timeseries[1] == init_value)
     plot_dt <- data.table(
@@ -184,44 +190,87 @@ plot_leverage_scenario <- function(index_timeseries) {
         index = index_timeseries
     )
 
-    plot_dt[
-        ,
-        index_daily_return := index / shift(index, fill = init_value) - 1
-    ]
-
+    # Base data
     plot_dt[
         ,
         `:=`(
-            letf_x2 = init_value * cumprod(index_daily_return * 2 + 1),
-            letf_x3 = init_value * cumprod(index_daily_return * 3 + 1)
+            index_daily_return = index / shift(index, fill = init_value) - 1,
+            index_cumulative_return = index / first(index) - 1
         )
     ]
-
     plot_dt[
         ,
         `:=`(
-            letf_x2_daily_return = letf_x2 / shift(letf_x2, fill = init_value) - 1,
-            letf_x3_daily_return = letf_x3 / shift(letf_x3, fill = init_value) - 1
+            letf_x2_daily = init_value * cumprod(index_daily_return * 2 + 1),
+            letf_x3_daily = init_value * cumprod(index_daily_return * 3 + 1),
+            letf_x2_never = index * (index_cumulative_return * 2 + 1),
+            letf_x3_never = index * (index_cumulative_return * 3 + 1)
+        )
+    ]
+    plot_dt[
+        ,
+        `:=`(
+            letf_x2_daily_daily_return = letf_x2_daily / shift(letf_x2_daily, fill = init_value) - 1,
+            letf_x3_daily_daily_return = letf_x3_daily / shift(letf_x3_daily, fill = init_value) - 1,
+            letf_x2_never_daily_return = letf_x2_never / shift(letf_x2_never, fill = init_value) - 1,
+            letf_x3_never_daily_return = letf_x3_never / shift(letf_x3_never, fill = init_value) - 1
         )
     ]
 
-    prices <- ggplot(plot_dt, aes(x = trading_day)) +
-        geom_line(aes(y = index, color = "Index"), linewidth = 1) +
-        geom_line(aes(y = letf_x2, color = "x2 LETF"), linewidth = 1) +
-        geom_line(aes(y = letf_x3, color = "x3 LETF"), linewidth = 1) +
-        geom_point(aes(y = index, color = "Index")) +
-        geom_point(aes(y = letf_x2, color = "x2 LETF")) +
-        geom_point(aes(y = letf_x3, color = "x3 LETF")) +
-        scale_color_manual(
-            values = c(
-                "Index" = "#1f77b4",
-                "x2 LETF" = "#ff7f0e",
-                "x3 LETF" = "#ff0e0eff"
-            )
-        ) +
-        scale_x_continuous(
-            breaks = seq(plot_dt[, min(trading_day)], plot_dt[, max(trading_day)])
-        ) +
+    # Data for the prices subplot
+    price_data <- plot_dt |>
+        melt(
+            id.vars = "trading_day",
+            measure.vars = show_series,
+            variable.name = "series",
+            value.name = "price"
+        )
+
+    # Data for the returns subplot
+    return_vars <- paste0(show_series, "_daily_return")
+    return_data <- plot_dt |>
+        melt(
+            id.vars = "trading_day",
+            measure.vars = return_vars,
+            variable.name = "series",
+            value.name = "daily_return"
+        )
+
+    # Color map for the prices subplot
+    color_map_prices <- c(
+        "index" = "#1f77b4",
+        "letf_x2_daily" = "#ff7f0e",
+        "letf_x3_daily" = "#ff0000",
+        "letf_x2_never" = "#fbbb83",
+        "letf_x3_never" = "#fb7e7e"
+    )
+
+    # Color map for the returns subplot
+    color_map_returns <- c(
+        "index_daily_return" = "#1f77b4",
+        "letf_x2_daily_daily_return" = "#ff7f0e",
+        "letf_x3_daily_daily_return" = "#ff0000",
+        "letf_x2_never_daily_return" = "#fbbb83",
+        "letf_x3_never_daily_return" = "#fb7e7e"
+    )
+
+    # Label mapping (only used by the returns subplot)
+    label_map <- c(
+        "index_daily_return" = "Index",
+        "letf_x2_daily_daily_return" = "x2 LETF with Daily Rebalancing",
+        "letf_x3_daily_daily_return" = "x3 LETF with Daily Rebalancing",
+        "letf_x2_never_daily_return" = "x2 LETF without Rebalancing",
+        "letf_x3_never_daily_return" = "x3 LETF without Rebalancing"
+    )
+
+    # Create consistent x-axis breaks for both plots
+    x_breaks <- seq(plot_dt[, min(trading_day)], plot_dt[, max(trading_day)])
+
+    prices <- ggplot(price_data, aes(x = trading_day, y = price, color = series)) +
+        geom_line(linewidth = 1) +
+        geom_point() +
+        scale_color_manual(values = color_map_prices[show_series]) +
+        scale_x_continuous(breaks = x_breaks) +
         labs(
             title = "Prices",
             x = element_blank(),
@@ -229,32 +278,15 @@ plot_leverage_scenario <- function(index_timeseries) {
             color = element_blank()
         ) +
         theme_minimal() +
-        theme(legend.position = "no")
+        theme(legend.position = "none")
 
-    returns <- plot_dt |>
-        melt(
-            id.vars = "trading_day",
-            measure.vars = c("index_daily_return", "letf_x2_daily_return", "letf_x3_daily_return"),
-            variable.name = "asset",
-            value.name = "daily_return"
-        ) |>
-        ggplot(aes(x = trading_day, y = daily_return * 100, fill = asset)) +
+    returns <- ggplot(return_data, aes(x = trading_day, y = daily_return * 100, fill = series)) +
         geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
         scale_fill_manual(
-            values = c(
-                "index_daily_return" = "#1f77b4",
-                "letf_x2_daily_return" = "#ff7f0e",
-                "letf_x3_daily_return" = "#ff0e0eff"
-            ),
-            labels = c(
-                "index_daily_return" = "Index",
-                "letf_x2_daily_return" = "x2 LETF",
-                "letf_x3_daily_return" = "x3 LETF"
-            )
+            values = color_map_returns[return_vars],
+            labels = label_map[return_vars]
         ) +
-        scale_x_continuous(
-            breaks = seq(plot_dt[, min(trading_day)], plot_dt[, max(trading_day)])
-        ) +
+        scale_x_continuous(breaks = x_breaks) +
         labs(
             title = "Daily Returns",
             x = "Trading Day",
@@ -274,7 +306,7 @@ plot_leverage_scenario <- function(index_timeseries) {
 ```
 
 @fig-lev-sce-up-sta, steady, 2% daily growth of the index. Constant returns which simply correspond to the index growth times 2 or 3.
-In such a case with low volatility, the performance of LETFs strictly equals the performance of the index times the amount of leverage. When that trend goes upward, long LETFs (i.e., LETFs whose leverage is positive) are very efficient in terms risk-adjusted yield **can I say that?**.
+In such a case with low volatility, the performance of LETFs strictly equals the performance of the index times the amount of leverage. When that trend goes upward, long LETFs (i.e., LETFs whose leverage is positive) are very efficient in terms risk-adjusted yield.
 
 ```{r}
 #| label: fig-lev-sce-up-sta
@@ -284,7 +316,9 @@ In such a case with low volatility, the performance of LETFs strictly equals the
 #| fig-height: 5.5
 
 upward_stable <- c(100, cumprod(rep(.02, 8) + 1) * 100)
-plot_leverage_scenario(upward_stable)
+# index_timeseries <- upward_stable
+# show_series <- c("index", "letf_x2_daily", "letf_x3_daily")
+plot_leverage_scenario(upward_stable, c("index", "letf_x2_daily", "letf_x3_daily"))
 ```
 
 But when volatility is introduced, a new phenomenon appears. Let's take an example.
@@ -300,7 +334,7 @@ with leverage:
 
 I.e. the multplicative factor that was enough to bring the index back to $100 (1.111), when multiplied by two (1.222), is not enough to bring back the 2x LETF back to $100. That's because the LETF lost more worth and, after the 10%/20% drop, one percent of the index is worth .9 cents while 1% of the 2x LETF is worth only .8 cents.
 
-@fig-lev-sce-sid-vol, index value goes sideways but with volatility above and below its 100 center point. Don't stay centered on 100, though. This drift is beta slippage.
+@fig-lev-sce-sid-vol, index value goes sideways but with volatility above and below its 100 center point. Don't stay centered on 100, though. This drift is volatility drag.
 ```{r}
 #| label: fig-lev-sce-sid-vol
 #| fig-cap: "To name"
@@ -361,5 +395,9 @@ This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was 
 ```{r}
 #| label: appendix
 
-print(sessionInfo(), locale = FALSE)
+print(sessionInfo(), locale = FALSE) |>
+    capture.output() |>
+    strwrap(width = 70, simplify = FALSE) |>
+    unlist() |>
+    cat(sep = "\n")
 ```

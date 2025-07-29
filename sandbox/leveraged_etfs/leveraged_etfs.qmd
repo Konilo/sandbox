@@ -59,7 +59,7 @@ These characteristics make CL2 and similar LETFs the easiest solution to gain le
 Nonetheless, this form of leverage implies certain additional risk factors compared to the equivalent, but unleveraged, scenario (namely a classic long, unleveraged, buy-and-hold strategy on [ESE](https://www.bnpparibas-am.com/fr-fr/individuel/fundsheet/equity/bnp-paribas-easy-sp-500-ucits-etf-eur-c-c-2-fr0011550185?tab=overview) -- a popular ETF tracking the S&P 500 index which is similar to the MSCI USA index):
 
 - the cost of the borrowing carried out by the fund evolves unpredictably over time and has a direct, negative impact on the perfomance of the LETF;
-- the daily rebalancing (daily reset of the leverage) increases the negative impact of the underlying index's volatility on the performance of the LETF -- this negative impact is called volatility drag. LETFs with a daily rebalancing are only marketed for detention periods of 1 trading day at most because funds want to discourage investors from exposing themselves to the daily rebalancings.
+- the daily rebalancing (daily reset of the leverage) increases the negative impact of the underlying index's volatility on the performance of the LETF -- this negative impact is called beta slippage. LETFs with a daily rebalancing are only marketed for detention periods of 1 trading day at most because funds want to discourage investors from exposing themselves to the daily rebalancings.
 
 Those weaknesses can make LETFs greatly underperform equivalent unleveraged ETFs (e.g., CL2 vs. ESE) if borrowing costs and/or volatility are high.
 
@@ -173,7 +173,7 @@ stopifnot(dt[is.na(ester) | is.na(usd_eur), .N == 0])
 ```
 
 
-# Understanding volatility drag
+# Understanding beta slippage
 
 ```{r}
 plot_leverage_scenario <- function(
@@ -203,8 +203,8 @@ plot_leverage_scenario <- function(
         `:=`(
             letf_x2_daily = init_value * cumprod(index_daily_return * 2 + 1),
             letf_x3_daily = init_value * cumprod(index_daily_return * 3 + 1),
-            letf_x2_never = index * (index_cumulative_return * 2 + 1),
-            letf_x3_never = index * (index_cumulative_return * 3 + 1)
+            letf_x2_never = init_value * (index_cumulative_return * 2 + 1),
+            letf_x3_never = init_value * (index_cumulative_return * 3 + 1)
         )
     ]
     plot_dt[
@@ -256,7 +256,7 @@ plot_leverage_scenario <- function(
 
     # Label mapping (only used by the returns subplot)
     label_map <- c(
-        "index_daily_return" = "Index",
+        "index_daily_return" = "Index Fund",
         "letf_x2_daily_daily_return" = "x2 LETF with Daily Rebalancing",
         "letf_x3_daily_daily_return" = "x3 LETF with Daily Rebalancing",
         "letf_x2_never_daily_return" = "x2 LETF without Rebalancing",
@@ -312,7 +312,52 @@ plot_leverage_scenario <- function(
 }
 ```
 
-@fig-lev-sce-up-sta, steady, 2% daily growth of the index. Constant returns which simply correspond to the index growth times 2 or 3.
+Let's first have a look at a putative 2x leveraged investment without rebalancing. That corresponds to a situation where one invested $100 and got $200 worth of the asset (an index fund) thanks to borrowing, for instance. For the sake of this example, we will consider a constant daily return of 2% on the index fund and ignore borrowing costs and fees. @fig-lev-1 shows that the cumulative return of the x2 leveraged investment is constantly equal to the cumulative return of the index fund times two.
+
+```{r}
+#| label: fig-lev-1
+#| fig-cap: "Leverage without rebalancing"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 5.5
+
+upward_stable <- c(100, cumprod(rep(.02, 20) + 1) * 100)
+plot_leverage_scenario(index_timeseries = upward_stable, show_series = c("index", "letf_x2_never"))
+```
+
+We also notice on @fig-lev-1 that the daily returns gradually converge: the one of the index fund was set to a constant 2%, but that translates to a daily return on the leveraged investment that starts at 4% and converges asymptotically to 2%. This is because, while the value of the initial $200 worth of index fund shares grows by 2% daily, the value of the debt stays constant. As the total value of the position (= value of the asset) increases, the debt (= $100) becomes negligible relative to the steadily growing equity (= position - debt). Hence, in the limit of infinitely many trading days, the leverage -- which is is the position to equity ratio -- approaches 1 and the daily returns asymptotically appproach 2%, like the unleveraged, underlying index fund. @eq-dai-ret-lev-no-reb demonstrates this (with $R_t = \text{daily return}$).
+
+$$
+R_t = \frac{200(1.02)^t - 200(1.02)^{t-1}}{200(1.02)^{t-1} - 100}
+$$
+
+$$
+= \frac{200(1.02)^{t-1} \cdot (1.02 - 1)}{200(1.02)^{t-1} - 100}
+$$
+
+$$
+= \frac{200(1.02)^{t-1} \cdot 0.02}{200(1.02)^{t-1} - 100}
+$$
+
+$$
+= \frac{(1.02)^{t-1} \cdot 0.02}{(1.02)^{t-1} - 0.5}
+$$
+
+$$
+\lim_{t \to \infty} R_t = \lim_{t \to \infty} \frac{(1.02)^{t-1} \cdot 0.02}{(1.02)^{t-1} - 0.5}
+$$
+
+$$
+= \frac{0.02 \cdot \infty}{\infty} = 0.02
+$$ {#eq-dai-ret-lev-no-reb}
+
+A key information here is the fact that, unless the underlying asset doesn't change in value, leverage needs rebalancing in order to stay at a constant level. Without it, the level of leverage decreases when the returns are positive and it increases when the returns are negative.
+
+what is rebalancing.
+
+segway to next plot.
+
+@fig-lev-sce-up-sta steady, 2% daily growth of the index. Constant returns which simply correspond to the index growth times 2 or 3.
 In such a case with low volatility, the performance of LETFs strictly equals the performance of the index times the amount of leverage. When that trend goes upward, long LETFs (i.e., LETFs whose leverage is positive) are very efficient in terms risk-adjusted yield.
 
 ```{r}
@@ -323,9 +368,11 @@ In such a case with low volatility, the performance of LETFs strictly equals the
 #| fig-height: 5.5
 
 upward_stable <- c(100, cumprod(rep(.02, 8) + 1) * 100)
-# index_timeseries <- upward_stable
-# show_series <- c("index", "letf_x2_daily", "letf_x3_daily")
 plot_leverage_scenario(upward_stable, c("index", "letf_x2_daily", "letf_x3_daily"))
+
+upward_volatile <- c(100, cumprod(rep(c(-0.01, 0.05), 4) + 1) * 100)
+plot_leverage_scenario(upward_volatile, c("index", "letf_x2_daily", "letf_x2_never"))
+# c("index", "letf_x2_daily", "letf_x3_daily", "letf_x2_never", "letf_x3_never")
 ```
 
 But when volatility is introduced, a new phenomenon appears. Let's take an example.
@@ -341,7 +388,7 @@ with leverage:
 
 I.e. the multplicative factor that was enough to bring the index back to $100 (1.111), when multiplied by two (1.222), is not enough to bring back the 2x LETF back to $100. That's because the LETF lost more worth and, after the 10%/20% drop, one percent of the index is worth .9 cents while 1% of the 2x LETF is worth only .8 cents.
 
-@fig-lev-sce-sid-vol, index value goes sideways but with volatility above and below its 100 center point. Don't stay centered on 100, though. This drift is volatility drag.
+@fig-lev-sce-sid-vol, index value goes sideways but with volatility above and below its 100 center point. Don't stay centered on 100, though. This drift is beta slippage.
 ```{r}
 #| label: fig-lev-sce-sid-vol
 #| fig-cap: "To name"

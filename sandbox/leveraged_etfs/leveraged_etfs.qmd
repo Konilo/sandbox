@@ -1,5 +1,5 @@
 ---
-title: "Should I Include Leveraged ETFs In My Portfolio?"
+title: "Leveraged ETFs -- The Case Of CL2"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
 toc: true
@@ -44,17 +44,17 @@ if (getwd() == "/app") {
 
 # Introduction
 
-In finance, leveraging means obtaining an exposition to an asset that surpasses one's stake. For instance, with a 2&times; (or "2:1") leveraged ETF (LETF), an investment of 1 euro grants 2-euro worth of exposition to the underlying asset of the LETF.
+In finance, leveraging means obtaining an exposition to an asset that surpasses one's stake. For instance, with a 2&times; (or "2:1") leveraged ETF (LETF), an investment of €1 grants 2-euro worth of exposition to the underlying asset of the LETF.
 
-The [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd) study showed that adopting a leveraged position on stocks may be interesting for retirement planning in a first section of one's career. The goal of such leveraging is to increase the expected returns given that, at that stage of life, one's total portfolio is overwhelmingly dominated by bond-like assets (futures savings from wages) thus causing one's exposition to risky assets to be far below what one's level of risk aversion (or utility function) recommends.
+The [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd) study showed that adopting a leveraged position on stocks may be interesting for retirement planning in a first section of one's career. The goal of such leveraging is to increase the expected returns given that, at that stage of life, one's total portfolio is overwhelmingly dominated by bond-like assets (future savings from wages) thus causing one's exposition to risky assets to be far below what one's level of risk aversion (i.e., utility function) recommends.
 
-Fundamentally, several methods make this possible, of which borrowing (e.g., mortgage loans, margin loans) is the most obvious one. But those methods also include more sophisticated schemes involving stock options (namely box spreads on future contracts).
+Fundamentally, leverage is made possible by borrowing: either plain borrowing (e.g., mortgage loans, margin loans) or more sophisticated schemes involving stock options or futures (namely box spreads).
 
 In this study, we will explore the intricacies of one LETF -- [Amundi ETF Leveraged MSCI USA Daily UCITS ETF - EUR](https://www.amundietf.fr/fr/professionnels/produits/equity/amundi-etf-leveraged-msci-usa-daily-ucits-etf-eur/fr0010755611), whose ticker is "CL2" -- which is designed to provide, at the scale of each trading day, a 2&times;, long exposition to the performance of the [MSCI USA index](https://www.msci.com/indexes/index/984000) (Net Return).
 
-- This LETF uses short-term, interbank borrowing to turn an investor's 1 euro stake into 2 euros of exposition. This gymnastic is solely managed by the fund.
-- The fund is eligible to the [Plan Epargne en Action (PEA)](https://www.economie.gouv.fr/particuliers/gerer-mon-argent/gerer-mon-budget-et-mon-epargne/quest-ce-que-le-plan-depargne-en) even though the index it tracks is entirely focused on the US. That is because it uses a *total return swap* between (i) a set of eligible assets (assets based in the European Union) it owns and (ii) the actual set of stocks in the MSCI USA Index owned by another company.
-- And CL2 also happens to be capitalizing which allows dividends to compound without reduced tax interference and grants the investor full control on their fiscal events.
+- This LETF uses short-term, interbank borrowing to turn an investor's €1 stake into €2 of exposition. This gymnastic is solely managed by the fund.
+- The fund is eligible to the French [Plan Epargne en Action (PEA)](https://www.economie.gouv.fr/particuliers/gerer-mon-argent/gerer-mon-budget-et-mon-epargne/quest-ce-que-le-plan-depargne-en) even though the index it tracks is entirely focused on the US. That is because it uses a *total return swap* between (i) a set of eligible assets (assets based in the European Union) it owns and (ii) the actual set of stocks in the MSCI USA Index owned by another company.
+- And CL2 also happens to be capitalizing which allows dividends to compound with reduced tax interference and grants the investor full control on their taxable events.
 
 These characteristics make CL2 and similar LETFs the easiest solution to gain leverage on stocks in France.
 
@@ -359,7 +359,7 @@ $$
 
 A key information here is the fact that, unless the underlying asset doesn't change in value, leverage needs rebalancing in order to stay at a constant level. Without it, the leverage factor decreases when the returns are positive and it increases when the returns are negative.
 
-But what is rebalancing exactly? It basically consists is readjusting the leverage factor after it has diverged because of the positive or negative evolution of the price of the asset. Keeping in mind @eq-lev, in the case above where the leverage has decreased at the end of day 2 due to a 2% return (@eq-reb-1), rebalancing would consist in borrowing more which reduces the $equity$ term (@eq-reb-2), in buying more shares without borrowing to increase the $position$ (@eq-reb-3), or in selling the 2% return to bring both the $position$ and the $equity$ back to their initial values (@eq-reb-4).
+But what is rebalancing exactly? It essentially consists is readjusting the leverage factor after it has diverged because of the positive or negative evolution of the price of the asset. Keeping in mind @eq-lev, in the case above where the leverage has decreased at the end of day 2 due to a 2% return (@eq-reb-1), rebalancing would consist in borrowing more which reduces the $equity$ term (@eq-reb-2), in buying more shares without borrowing to increase the $position$ (@eq-reb-3), or in selling the 2% return to bring both the $position$ and $equity$ back to their initial values (@eq-reb-4).
 
 $$
 \text{leverage}_\text{day 2} = \frac{200 \times 1.02}{200 \times 1.02 - 100} = \frac{2.04}{1.04} \approx 1.96
@@ -377,7 +377,7 @@ $$
 \text{leverage}_\text{day 2} = \frac{200 \times 1.02 - 200 \times 0.02}{200 \times 1.02 - 100 - 200 \times 0.02} = \frac{2}{1} = 2
 $$ {#eq-reb-4}
 
-LETFs with daily rebalancing automatically manage this rebalancing after the end of each trading day. @fig-2 draws the comparison between never rebalancing and rebalancing once a day. We can see that the daily rebalanced LETF keeps a steady daily return equal to two times the daily return of index fund, unlike the decaying daily return of the non-rebalanced investment. Hence, everyday, daily-rebalanced LETFs allow the same "bet" to be made. We also observe that if the LETF is held more than one day, its cumulative return exceeds two times the cumulative return of the index fund. That is thanks to compounding: the returns from day D are accounted for in the leverage on day D+1 and so on, basically.
+LETFs with daily rebalancing automatically manage this rebalancing after the end of each trading day. @fig-2 draws the comparison between never rebalancing and rebalancing once a day. We can see that the daily rebalanced LETF keeps a steady daily return equal to two times the daily return of index fund, unlike the decaying daily return of the non-rebalanced investment. Hence, everyday, daily-rebalanced LETFs allow the same "bet" to be made. We also observe that if the LETF is held more than one day, its cumulative return exceeds two times the cumulative return of the index fund. That is thanks to compounding: the returns from day D are accounted for in the leverage on day D+1 and so on.
 
 ```{r}
 #| label: fig-2
@@ -404,13 +404,11 @@ plot_leverage_scenario(downard_stable, c("index", "letf_2x_daily", "invest_2x_ne
 
 So far, we have only looked at highly-unrealistic scenarios with constant daily returns. By introducing some volatility, we will notice that a new phenomenon appears.
 
-Let an index fund with an initial share price of €100 on trading day 1. On day 2, the price dropped to 90% constituting a 10% drop. To make up for this loss and come back to €100, a 10% gain is not enough ($\text{€}90 \times 1.1 = \text{€}99$), we need a ~11% gain ($\text{€}90 \times (1 + \text{€}10/\text{€}90) \approx \text{€}90 \times 1.11 \approx \text{€}100$). This is simply because the difference in value (€10) corresponds to a different proportion of the share price before (10%) and after (11%) the loss.
+Let an index fund with an initial share price of €100 on trading day 1. On day 2, the price dropped to €90, constituting a 10% drop. To make up for this loss and come back to €100, a 10% gain is not enough ($\text{€}90 \times 1.1 = \text{€}99$), we need a ~11% gain ($\text{€}90 \times (1 + \text{€}10/\text{€}90) \approx \text{€}90 \times 1.11 \approx \text{€}100$). This is simply because the difference in value (€10) corresponds to a different proportion of the share price before (10%) and after (11%) the loss.
 
-Now let's consider a 2&times; LETF on that index fund with a €100 initial value and daily rebalancing. At the end of day 2, it lost $10 \times 2 = \text{€}20$ and closes at €80. If on the next day, the index returns ~11% which is enough for it to breakeven, this won't be enough for the LETF to breakeven: $\text{€}80 \times (1 + \text{€}10/\text{€}90 \times 2) \approx \text{€}97.78$. To breakeven, the LETF needs the underlying index fund not only to breakeven but to overperfom its intial price with a 12.5% return: $\text{€}80 \times (1 + \text{€}20/\text{€}80) = \text{€}80 \times (1 + \text{€}11.25/\text{€}90 \times 2) = \text{€}80 \times (1 + 0.125 \times 2) = \text{€}100$.
+Now let's consider a 2&times; LETF on that index fund with a €100 initial value and daily rebalancing. At the end of day 2, it lost $\text{€}10 \times 2 = \text{€}20$ and closes at €80. If on the next day, the index returns ~11% which is enough for it to breakeven, this won't be enough for the LETF to breakeven: $\text{€}80 \times (1 + \text{€}10/\text{€}90 \times 2) \approx \text{€}97.78$. To breakeven, the LETF needs the underlying index fund not only to breakeven but to surpass its intial price via a 12.5% return: $\text{€}80 \times (1 + \text{€}20/\text{€}80) = \text{€}80 \times (1 + \text{€}11.25/\text{€}90 \times 2) = \text{€}80 \times (1 + 0.125 \times 2) = \text{€}100$. In other words, the return that was enough to bring the index back to €100 (~11%), when multiplied by two (~22%), is not enough to bring back the 2&times; LETF back to €100. That's because shares of the LETF lost more worth than those of the index fund: after the loss on day 2, one percent of a share of the index fund is worth $90 \times 0.01 = 0.9$ cents, while one percent of a share of the 2&times; LETF is only worth $80 \times 0.01 = 0.8$ cents. This is the crux of beta slippage. Note that beta slippage affects all investment, as shown in the anteprevious paragraph, but it is amplified by leverage and volatility as we will explain.
 
-In other words, the return that was enough to bring the index back to €100 (~11%), when multiplied by two (~22%), is not enough to bring back the 2&times; LETF back to €100. That's because shares of the LETF lost more worth than those of the index fund: after the loss on day 2, one percent of a share of the index fund is worth $90 \times 0.01 = 0.9$ cents, while one percent of a share of the 2&times; LETF is only worth $80 \times 0.01 = 0.8$ cents. This is the crux of beta slippage. Note that beta slippage affects all investment, as shown in the anteprevious paragraph, but it is amplified by leverage and volatility as we will explain.
-
-@fig-4 illustrates beta slippage. We have an index fund whose share value oscillates between €102 & €98 constituting a volatile sideways market. The price of a share of the associated 2&times; LETF with daily rebalancing gradually drifts instead staying centered on its intitial value like the index fund. We can also note that, without rebalancing, beta slippage doesn't occur since compounding is a necessary condition for beta slippage.
+@fig-4 illustrates beta slippage. We have an index fund whose share price oscillates between €102 & €98, constituting a volatile sideways market. The price of a share of the associated 2&times; LETF with daily rebalancing gradually drifts instead of staying centered on its intitial value like the index fund. We can also note that, without rebalancing, beta slippage doesn't occur since compounding is a necessary condition.
 ```{r}
 #| label: fig-4
 #| fig-cap: "Beta slippage with a 2x daily-rebalanced LETF and with a 2x leveraged investment in a volatile sideways market"
@@ -422,7 +420,7 @@ sideways_volatile <- c(100, rep(c(102, 98), 8))
 plot_leverage_scenario(sideways_volatile, c("index", "letf_2x_daily", "invest_2x_never"))
 ```
 
-And @fig-5 shows that beta slippage is accentuated by the leverage factor.
+@fig-5 shows that beta slippage is accentuated by the leverage factor.
 
 ```{r}
 #| label: fig-5
@@ -434,7 +432,7 @@ And @fig-5 shows that beta slippage is accentuated by the leverage factor.
 plot_leverage_scenario(sideways_volatile, c("index", "letf_2x_daily", "letf_3x_daily"))
 ```
 
-If the daily returns are volatile but positive (or positive and null), beta slippage will cause the daily-rebalanced LETFs to have a return that surpasses the return of the underlying asset multiplied by the leverage (@fig-2 & @fig-6). In such cases, the compounding is in the investor's interest.
+If the daily returns are volatile but positive (or positive and null), beta slippage will cause the daily-rebalanced LETF to have a return that surpasses the return of the underlying asset multiplied by the leverage (@fig-2 & @fig-6). In such cases, the compounding is in the investor's interest.
 ```{r}
 #| label: fig-6
 #| fig-cap: "Beta slippage with 2x and 3x daily-rebalanced LETFs in a volatile upward market"
@@ -461,7 +459,7 @@ plot_leverage_scenario(upward_volatile, c("index", "letf_2x_daily", "letf_3x_dai
 Let *positive beta slippage* describe the situation where a daily-rebalanced LETF of leverage $L$ has a cumulative return that is superior to the cumulative return of the underlying asset multiplied by $L$. And vice versa for *negative beta slippage*. We have seen that beta slippage is positive when the daily returns are positive (or positive and null) and negative one when they are negative (or negative and null). But in practice, daily returns on a stock or index fund fluctuate between negative and positive values. In that case, the beta slippage can be positive or negative depending on the specific path the share price took -- this is path-dependance: it's not only the starting and ending prices of the underlying that dictate the cumulative return, but also the path taken.
 
 
-# MSCI USA's Volatility
+# MSCI USA's volatility
 
 ```{r}
 msci_usa_usd_eur <- merge(
@@ -498,7 +496,7 @@ ggplot(vol_plot_dt, aes(x = year, y = annualized_volatility)) +
 ```
 
 
-# MSCI USA & CL2 Return
+# MSCI USA & CL2 return
 
 ```{r}
 compute_cagr <- function(start_value, end_value, trading_days, trading_days_per_year = 252) {
@@ -584,7 +582,7 @@ ggplot(cum_ret_comp_plot_dt, aes(x = date, y = cum_return, color = series)) +
     )
 ```
 
-From 2020-01-01 to 2025-07-27, @tbl-1 summarizes the risk-adjusted returns of the index and of CL2, each year. (The Sharpe ratios are computed without a risk-free rate.) In 2020, we can see that, due to negative beta slippage from high volatility (34% annualized), CL2 was far from delivering a return near two times the return of the underlying index, hence a lower Sharpe ratio (0.09 vs 0.26). In 2021 though, when volatility was low (13%) and the market was trending up, CL2 improved its Sharpe ratio relative to the unleveraged index -- it more than doubled the return thanks to positive beta slippage. Borrowing costs and fees also play their role. The former peaked in 2024 (around 3.9%, cf. @fig-10) which could contribute to explaining why, despite an upward market and low volatility, the Sharpe ratio was not substantially raised by the LETF relative to the underlying. The latter is constant (0.5% per year). Note that 2025 figures represent annualized returns based on partial year data through July.
+From 2020-01-01 to 2025-07-27, @tbl-1 summarizes the risk-adjusted returns of the index and of CL2, each year. (The Sharpe ratios are computed without a risk-free rate.) In 2020, we can see that, due to negative beta slippage caused by high volatility (34% annualized), CL2 was far from delivering a return near two times the return of the underlying index, hence a lower Sharpe ratio (0.09 vs 0.26). In 2021 though, when volatility was low (13%) and the market was trending up, CL2 improved the Sharpe ratio relative to the unleveraged index -- it more than doubled the return thanks to positive beta slippage. Borrowing costs and fees also play their role. The former peaked in 2024 (around 3.9%, cf. @fig-10) which could contribute to explaining why, despite an upward market and low volatility, the Sharpe ratio was not substantially raised by the LETF relative to the underlying. The latter is constant (0.5% per year). Note that 2025 figures represent annualized returns based on partial year data through July.
 ```{r}
 #| label: tbl-1
 #| tbl-cap: "Risk-adjusted returns of the MSCI USA index (net, EUR) & of the CL2"
@@ -623,6 +621,7 @@ LETFs rely on borrowing to leverage their position. In the case of CL2, the ESTE
 #| label: fig-10
 #| fig-cap: "Evolution of the ESTER (per month)"
 #| fig-pos: "H"
+#| fig-height: 3
 
 ggplot(ester, aes(x = date, y = ester)) +
     geom_line() +
@@ -788,10 +787,13 @@ kable(
 )
 ```
 
+The errors are quite high but not enough to make the predictions useless, I would say. The actual vs. predicted correlation is excellent. Hence, I will consider that the formula has a good enough accuracy to make forward simulations.
+
 
 ## Forward simulations
+
 ```{r}
-plot_letf_expected_returns <- function(
+plot_exp_returns_fixed_underlying_return <- function(
     underlying_return,
     leverage = 2,
     volatility_range = seq(0.1, 0.5, by = 0.05),
@@ -823,6 +825,14 @@ plot_letf_expected_returns <- function(
             high = "#0ea600ff",
             midpoint = underlying_return
         ) +
+        scale_x_continuous(
+            breaks = interest_rate_range * 100,
+            minor_breaks = NULL
+        ) +
+        scale_y_continuous(
+            breaks = volatility_range * 100,
+            minor_breaks = NULL
+        ) +
         labs(
             caption = paste0(
                 "Underlying Return: ", underlying_return * 100,
@@ -836,35 +846,123 @@ plot_letf_expected_returns <- function(
         theme_minimal() +
         theme(legend.position = "none")
 }
+
+plot_exp_returns_fixed_interest_rate <- function(
+    interest_rate,
+    leverage = 2,
+    volatility_range = seq(0.1, 0.5, by = 0.05),
+    fund_expense_ratio = 0.005,
+    underlying_return_range = seq(0.05, 0.13, by = 0.01)
+) {
+    plot_data <- CJ(
+        volatility = volatility_range,
+        underlying_return = underlying_return_range
+    )[
+        ,
+        expected_return := mapply(function(vol, ret) {
+            compute_letf_expected_return(
+                leverage = leverage,
+                underlying_expected_return = ret,
+                underlying_volatility = vol,
+                fund_expense_ratio = fund_expense_ratio,
+                borrowing_rate = interest_rate
+            )
+        }, volatility, underlying_return)
+    ][
+        # Create delta column: LETF return minus underlying return
+        ,
+        return_delta := expected_return - underlying_return
+    ]
+    
+    ggplot(plot_data, aes(x = underlying_return * 100, y = volatility * 100, fill = return_delta)) +
+        geom_tile() +
+        geom_text(aes(label = round(expected_return * 100, 1)), color = "black", size = 3) +
+        scale_fill_gradient2(
+            low = "#a60000ff",
+            mid = "white", 
+            high = "#0ea600ff",
+            midpoint = 0
+        ) +
+        scale_x_continuous(
+            breaks = underlying_return_range * 100,
+            minor_breaks = NULL
+        ) +
+        scale_y_continuous(
+            breaks = volatility_range * 100,
+            minor_breaks = NULL
+        ) +
+        labs(
+            caption = paste0(
+                "Interest Rate: ", interest_rate * 100,
+                "%, Leverage Factor: ",
+                leverage, ", Fund Expense Ratio: ",
+                fund_expense_ratio * 100, "%"
+            ),
+            x = "Underlying Return (%)",
+            y = "Volatility (% points)"
+        ) +
+        theme_minimal() +
+        theme(legend.position = "none")
+}
+```
+
+@fig-fwd-13, @fig-fwd-10, @fig-fwd-7, and @fig-fwd-5 show the expected annual return of a 2&times; LETF on an underlying asset with a fixed expected return of 13%, 10%, 7%, and 5% respectively. The color gradient is centered (white) on the return of the underlying asset. @fig-fwd-int-2 shows the expected annual return of a 2&times; LETF with a fixed interest rate of 2%. Those figures illustrate the decisive role of the underlying asset's return, the volatility, and interest rates.
+
+```{r}
+#| label: fig-fwd-13
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with a 13% expected return"
+#| fig-pos: "H"
+#| fig-height: 3
+
+plot_exp_returns_fixed_underlying_return(underlying_return = 0.13)
 ```
 
 ```{r}
 #| label: fig-fwd-10
-#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with an expected return of 10%"
-#| fig-pos: "H" 
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with a 10% expected return"
+#| fig-pos: "H"
+#| fig-height: 3
 
-plot_letf_expected_returns(underlying_return = 0.1)
+plot_exp_returns_fixed_underlying_return(underlying_return = 0.1)
 ```
 
 ```{r}
 #| label: fig-fwd-7
-#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with an expected return of 7%"
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with a 7% expected return"
 #| fig-pos: "H" 
+#| fig-height: 3
 
-plot_letf_expected_returns(underlying_return = 0.07)
+plot_exp_returns_fixed_underlying_return(underlying_return = 0.07)
 ```
 
 ```{r}
 #| label: fig-fwd-5
-#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with an expected return of 5%"
-#| fig-pos: "H" 
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with a 5% expected return"
+#| fig-pos: "H"
+#| fig-height: 3
 
-plot_letf_expected_returns(underlying_return = 0.05)
+plot_exp_returns_fixed_underlying_return(underlying_return = 0.05)
 ```
 
-# Conclusions
+```{r}
+#| label: fig-fwd-int-2
+#| fig-cap: "Expected annual return of a 2x LETF with a 2% interest rate"
+#| fig-pos: "H"
+#| fig-height: 3
 
-Maybe.
+plot_exp_returns_fixed_interest_rate(interest_rate = 0.02)
+```
+
+
+# Discussion & conclusions
+
+The choice to buy-and-hold CL2 on the long-term (e.g., for retirment planning) is much more complex than the choice to buy-and-hold a corresponding unleveraged index fund. This is because daily-rebalanced leverage introduces two new factors determining the return: volatility and interest rates. One needs a conviction, not only on positive returns on the underlying index, but also on low volatility and interest rates to consider CL2 as a valid option.
+
+The recent performance of CL2 has been expectional thanks to low interest rates, low volatility, and high returns from US large caps. Interest rates have increased substantially since 2022. Volatility is currently heightened by Trump's controversial political and economical decisions aiming at overhauling the US's role in the world and, thus, at reshaping the world order. US returns remain very high. Maintaining this growth rate is neither guaranteed nor impossible. In the medium term, it seems to primarily rest on the commercial success of artificial intelligence (Narayan and Greene, [2024](https://www.bridgewater.com/research-and-insights/us-exceptionalism-drivers-of-equity-outperformance-and-whats-needed-for-a-repeat)). Those signals are negative for the near future. They are also short-sighted: a US presidential mandate lasts four years, bubbles burst (if AI happens to be one).
+
+According to the predictions (@fig-fwd-int-2), letting a 2% interest rate (i.e., approximately the current ESTER) and a 10% return on the index, CL2 would need the index's volatility to be below 25-30 % points. Considering a 5% return on the index (and still a 2% interest rate), volatility would need to be at 15% or below. Though, we must note that just breaking even with the MSCI USA index would mean that the risk-adjusted return (Sharpe ratio) of the LETF would be much lower i.e., CL2 would be much more volatile without delivering more returns.
+
+In that context, leveraging methods that don't involve daily rebalancing and, thus, are not that vulnerable to beta slippage (e.g., margin loans, box spreads, long-term call options) would be preferable, technically. But they are much less accessible to individual French investors because of their complexity or due to fiscal barriers.
 
 
 # Appendix
@@ -872,9 +970,6 @@ Maybe.
 This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
 ```{r}
 #| label: appendix
-
-# TODO
-# - use either $ or €
 
 print(sessionInfo(), locale = FALSE) |>
     capture.output() |>

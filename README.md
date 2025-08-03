@@ -7,7 +7,7 @@ Studies coded with R, Python, and [Quarto](https://quarto.org/), developed in a 
 
 - [Lifecycle Investing](https://github.com/Konilo/sandbox/tree/main/sandbox/lifecycle_investing/lifecycle_investing.qmd): an exploration of a few striking aspects of this approach in the context of retirement planning.
 - [Artprice100](https://github.com/Konilo/sandbox/tree/main/sandbox/artprice100/artprice100.pdf): a basic financial analysis of the Artprice100 index.
-- [Leveraged ETFs -- The Case Of CL2](https://github.com/Konilo/sandbox/tree/main/sandbox/leveraged_etfs/leveraged_etfs.pdf): a study of daily-rebalanced leveraged ETFs and an outlook on CL2's relevance for long-term investors.
+- [Leveraged ETFs &ndash; The Case Of CL2](https://github.com/Konilo/sandbox/tree/main/sandbox/leveraged_etfs/leveraged_etfs.pdf): a study of daily-rebalanced leveraged ETFs and an outlook on CL2's relevance for long-term investors.
 
 
 ## Setup and reproduction of the results

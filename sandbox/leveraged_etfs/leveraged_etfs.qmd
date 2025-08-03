@@ -8,6 +8,7 @@ format:
     toc: true
     number-sections: true
     colorlinks: true
+    papersize: a4
 execute:
     echo: false
 ---
@@ -28,6 +29,7 @@ library(ggplot2)
 library(readxl)
 library(lubridate)
 library(patchwork)
+library(knitr)
 
 # Runs when executing R interactively (because app/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
@@ -76,7 +78,7 @@ The time series used in this study are listed in @tbl-materials.
 | Euro Short-Term Rate (ESTER)               | [https://www.boursorama.com/bourse/taux/cours/1xESTER/](https://www.boursorama.com/bourse/taux/cours/1xESTER/) |
 | USD/EUR             | [https://finance.yahoo.com/quote/USDEUR=X/](https://finance.yahoo.com/quote/USDEUR=X/)             |
 | CL2                 | [https://finance.yahoo.com/quote/CL2.PA/](https://finance.yahoo.com/quote/CL2.PA/)               |
-: Metarials of the study {#tbl-materials}
+: Materials of the study {#tbl-materials}
 
 ```{r}
 #| label: data-loading
@@ -312,20 +314,20 @@ plot_leverage_scenario <- function(
 }
 ```
 
-Let's first have a look at a putative 2&times; leveraged investment without rebalancing. That corresponds to a situation where one invested €100 and got €200 worth of the asset (an index fund) thanks to borrowing (i.e., with a €100 loan), for instance. For the sake of this example, we will consider a constant daily return of 2% on the index fund and ignore borrowing costs and fees. @fig-lev-1 shows that the cumulative return of the 2&times; leveraged investment is constantly equal to the cumulative return of the index fund multiplied by two.
+Let's first have a look at a putative 2&times; leveraged investment without rebalancing. That corresponds to a situation where one invested €100 and got €200 worth of the asset (an index fund) thanks to borrowing (i.e., with a €100 loan), for instance. For the sake of this example, we will consider a constant daily return of 2% on the index fund and ignore borrowing costs and fees. @fig-1 shows that the cumulative return of the 2&times; leveraged investment is constantly equal to the cumulative return of the index fund multiplied by two.
 
 ```{r}
-#| label: fig-lev-1
+#| label: fig-1
 #| fig-cap: "Leverage without rebalancing"
 #| fig-pos: "H"
 #| fig-width: 5.5
-#| fig-height: 5.5
+#| fig-height: 4.5
 
 upward_stable <- c(100, cumprod(rep(.02, 20) + 1) * 100)
 plot_leverage_scenario(index_timeseries = upward_stable, show_series = c("index", "invest_2x_never"))
 ```
 
-We also notice on @fig-lev-1 that the daily returns gradually converge: the one of the index fund was set to a constant 2%, but that translates to a daily return on the leveraged investment that starts at 4% and converges asymptotically to 2%. This is because, while the value of the initial €200 worth of index fund shares grows by 2% daily, the value of the debt stays constant. As the total value of the position (= value of the asset) increases, the debt (= €100) becomes negligible relative to the steadily growing equity (= position - debt). Hence, in the limit of infinitely many trading days, the leverage -- which is is the position to equity ratio (@eq-lev) -- approaches 1 and the daily returns asymptotically appproach 2%, like the unleveraged, underlying index fund. @eq-dai-ret-lev-no-reb demonstrates this.
+We also notice on @fig-1 that the daily returns gradually converge: the one of the index fund was set to a constant 2%, but that translates to a daily return on the leveraged investment that starts at 4% and converges asymptotically to 2%. This is because, while the value of the initial €200 worth of index fund shares grows by 2% daily, the value of the debt stays constant. As the total value of the position (= value of the asset) increases, the debt (= €100) becomes negligible relative to the steadily growing equity (= position - debt). Hence, in the limit of infinitely many trading days, the leverage -- which is is the position to equity ratio (@eq-lev) -- approaches 1 and the daily returns asymptotically appproach 2%, like the unleveraged, underlying index fund. @eq-dai-ret-lev-no-reb demonstrates this.
 
 $$
 leverage = \frac{position}{equity} = \frac{position}{position - debt}
@@ -336,28 +338,28 @@ $$
 $$ {#eq-dai-ret-lev-no-reb}
 
 $$
-= \frac{200(1.02)^{t-1} \cdot (1.02 - 1)}{200(1.02)^{t-1} - 100}
+= \frac{200(1.02)^{t-1} \times (1.02 - 1)}{200(1.02)^{t-1} - 100}
 $$
 
 $$
-= \frac{200(1.02)^{t-1} \cdot 0.02}{200(1.02)^{t-1} - 100}
+= \frac{200(1.02)^{t-1} \times 0.02}{200(1.02)^{t-1} - 100}
 $$
 
 $$
-= \frac{(1.02)^{t-1} \cdot 0.02}{(1.02)^{t-1} - 0.5}
+= \frac{(1.02)^{t-1} \times 0.02}{(1.02)^{t-1} - 0.5}
 $$
 
 $$
-\lim_{t \to \infty} \text{daily return} = \lim_{t \to \infty} \frac{(1.02)^{t-1} \cdot 0.02}{(1.02)^{t-1} - 0.5}
+\lim_{t \to \infty} \text{daily return} = \lim_{t \to \infty} \frac{(1.02)^{t-1} \times 0.02}{(1.02)^{t-1} - 0.5}
 $$
 
 $$
-= \frac{0.02 \cdot \infty}{\infty} = 0.02
+= \frac{0.02 \times \infty}{\infty} = 0.02
 $$
 
-A key information here is the fact that, unless the underlying asset doesn't change in value, leverage needs rebalancing in order to stay at a constant level. Without it, the level of leverage decreases when the returns are positive and it increases when the returns are negative.
+A key information here is the fact that, unless the underlying asset doesn't change in value, leverage needs rebalancing in order to stay at a constant level. Without it, the leverage factor decreases when the returns are positive and it increases when the returns are negative.
 
-But what is rebalancing exactly? It basically consists is readjusting the level of leverage after it has diverged because of the positive or negative evolution of the price of the asset. Keeping in mind @eq-lev, in the case above where the leverage has decreased at the end of day 2 due to a 2% return (@eq-reb-1), rebalancing would consist in borrowing more which reduces the $equity$ term (@eq-reb-2), in buying more shares without borrowing to increase the $position$ (@eq-reb-3), or in selling the 2% return to bring both the $position$ and the $equity$ back to their initial values (@eq-reb-4).
+But what is rebalancing exactly? It basically consists is readjusting the leverage factor after it has diverged because of the positive or negative evolution of the price of the asset. Keeping in mind @eq-lev, in the case above where the leverage has decreased at the end of day 2 due to a 2% return (@eq-reb-1), rebalancing would consist in borrowing more which reduces the $equity$ term (@eq-reb-2), in buying more shares without borrowing to increase the $position$ (@eq-reb-3), or in selling the 2% return to bring both the $position$ and the $equity$ back to their initial values (@eq-reb-4).
 
 $$
 \text{leverage}_\text{day 2} = \frac{200 \times 1.02}{200 \times 1.02 - 100} = \frac{2.04}{1.04} \approx 1.96
@@ -372,108 +374,493 @@ $$
 $$ {#eq-reb-3}
 
 $$
-\text{leverage}_\text{day 2} = \frac{200 \times 1.02 - 200 * 0.02}{200 \times 1.02 - 100 - 200 * 0.02} = \frac{2}{1} = 2
+\text{leverage}_\text{day 2} = \frac{200 \times 1.02 - 200 \times 0.02}{200 \times 1.02 - 100 - 200 \times 0.02} = \frac{2}{1} = 2
 $$ {#eq-reb-4}
 
-LETFs with daily rebalancing automatically manage this rebalancing after the end of each trading day. @fig-lev-2 draws the comparison between never rebalancing and rebalancing once a day. We can see that the daily rebalanced LETF keeps a steady daily return equal to two times the daily return of index fund, unlike the decaying daily return of the non-rebalanced investment. Hence, everyday, daily-rebalanced LETFs allow the same "bet" to be made. We also observe that if the LETF is held more than one day, its cumulative return exceeds two times the cumulative return of the index fund. That is thanks to compounding: the returns from day D are accounted for in the leverage on day D+1 and so on, basically.
+LETFs with daily rebalancing automatically manage this rebalancing after the end of each trading day. @fig-2 draws the comparison between never rebalancing and rebalancing once a day. We can see that the daily rebalanced LETF keeps a steady daily return equal to two times the daily return of index fund, unlike the decaying daily return of the non-rebalanced investment. Hence, everyday, daily-rebalanced LETFs allow the same "bet" to be made. We also observe that if the LETF is held more than one day, its cumulative return exceeds two times the cumulative return of the index fund. That is thanks to compounding: the returns from day D are accounted for in the leverage on day D+1 and so on, basically.
 
 ```{r}
-#| label: fig-lev-2
+#| label: fig-2
 #| fig-cap: "Leverage with or without rebalancing in an upward market"
 #| fig-pos: "H"
 #| fig-width: 5.5
-#| fig-height: 5.5
+#| fig-height: 4.5
+
 plot_leverage_scenario(upward_stable, c("index", "letf_2x_daily", "invest_2x_never"))
 ```
 
-Of course, when the returns are negative, leverage expands the losses (@fig-lev-3). Note that this is not symmetric relative to @fig-lev-2: the LETF leads to less losses than the unbalanced, leveraged investment. This is due to the daily rebalancing: over time, a 2 &times; 2% = 4% daily loss corresponds to a decreasing absolute sum of money lost.
+Of course, when the returns are negative, leverage expands the losses (@fig-3). Note that this figure is not symmetric relative to @fig-2: the LETF leads to less losses than the unbalanced, leveraged investment. This is due to the daily rebalancing: over time, a 2 &times; 2% = 4% daily loss corresponds to a decreasing absolute sum of money lost.
 
 ```{r}
-#| label: fig-lev-3
+#| label: fig-3
 #| fig-cap: "Leverage with or without rebalancing in a downward market"
 #| fig-pos: "H"
 #| fig-width: 5.5
-#| fig-height: 5.5
+#| fig-height: 4.5
 
 downard_stable <- c(100, cumprod(rep(-.02, 20) + 1) * 100)
 plot_leverage_scenario(downard_stable, c("index", "letf_2x_daily", "invest_2x_never"))
 ```
 
-But when volatility is introduced, a new phenomenon appears. Let's take an example.
+So far, we have only looked at highly-unrealistic scenarios with constant daily returns. By introducing some volatility, we will notice that a new phenomenon appears.
 
-- index, market agrees on $100 but with some fluctuations around that valuation.
-- 10% drop means $100 down to $90
-- to go back to the initial $100, we need a 11.1% increase
+Let an index fund with an initial share price of €100 on trading day 1. On day 2, the price dropped to 90% constituting a 10% drop. To make up for this loss and come back to €100, a 10% gain is not enough ($\text{€}90 \times 1.1 = \text{€}99$), we need a ~11% gain ($\text{€}90 \times (1 + \text{€}10/\text{€}90) \approx \text{€}90 \times 1.11 \approx \text{€}100$). This is simply because the difference in value (€10) corresponds to a different proportion of the share price before (10%) and after (11%) the loss.
 
-with leverage:
+Now let's consider a 2&times; LETF on that index fund with a €100 initial value and daily rebalancing. At the end of day 2, it lost $10 \times 2 = \text{€}20$ and closes at €80. If on the next day, the index returns ~11% which is enough for it to breakeven, this won't be enough for the LETF to breakeven: $\text{€}80 \times (1 + \text{€}10/\text{€}90 \times 2) \approx \text{€}97.78$. To breakeven, the LETF needs the underlying index fund not only to breakeven but to overperfom its intial price with a 12.5% return: $\text{€}80 \times (1 + \text{€}20/\text{€}80) = \text{€}80 \times (1 + \text{€}11.25/\text{€}90 \times 2) = \text{€}80 \times (1 + 0.125 \times 2) = \text{€}100$.
 
-- 100 -20% gives 80%
-- 80 +22.2% gives $97.78
+In other words, the return that was enough to bring the index back to €100 (~11%), when multiplied by two (~22%), is not enough to bring back the 2&times; LETF back to €100. That's because shares of the LETF lost more worth than those of the index fund: after the loss on day 2, one percent of a share of the index fund is worth $90 \times 0.01 = 0.9$ cents, while one percent of a share of the 2&times; LETF is only worth $80 \times 0.01 = 0.8$ cents. This is the crux of beta slippage. Note that beta slippage affects all investment, as shown in the anteprevious paragraph, but it is amplified by leverage and volatility as we will explain.
 
-I.e. the multplicative factor that was enough to bring the index back to €100 (1.111), when multiplied by two (1.222), is not enough to bring back the 2&times; LETF back to $100. That's because the LETF lost more worth and, after the 10%/20% drop, one percent of the index is worth .9 cents while 1% of the 2&times; LETF is worth only .8 cents.
-
-@fig-lev-4, index value goes sideways but with volatility above and below its 100 center point. Don't stay centered on 100, though. This drift is beta slippage.
+@fig-4 illustrates beta slippage. We have an index fund whose share value oscillates between €102 & €98 constituting a volatile sideways market. The price of a share of the associated 2&times; LETF with daily rebalancing gradually drifts instead staying centered on its intitial value like the index fund. We can also note that, without rebalancing, beta slippage doesn't occur since compounding is a necessary condition for beta slippage.
 ```{r}
-#| label: fig-lev-4
-#| fig-cap: "To name"
+#| label: fig-4
+#| fig-cap: "Beta slippage with a 2x daily-rebalanced LETF and with a 2x leveraged investment in a volatile sideways market"
 #| fig-pos: "H"
 #| fig-width: 5.5
-#| fig-height: 5.5
-
-# intuitive
-# graphic
-# mathemartic
-
-# upward_volatile <- c(100, cumprod(rep(c(-0.01, 0.05), 4) + 1) * 100)
-# plot_leverage_scenario(upward_volatile, c("index", "letf_2x_daily", "invest_2x_never"))
-# c("index", "letf_2x_daily", "letf_3x_daily", "invest_2x_never", "invest_3x_never")
+#| fig-height: 4.5
 
 sideways_volatile <- c(100, rep(c(102, 98), 8))
 plot_leverage_scenario(sideways_volatile, c("index", "letf_2x_daily", "invest_2x_never"))
 ```
 
-And that's accentuated by the level of leverage
+And @fig-5 shows that beta slippage is accentuated by the leverage factor.
 
 ```{r}
-#| label: fig-lev-5
-#| fig-cap: "To name"
+#| label: fig-5
+#| fig-cap: "Beta slippage with 2x and 3x daily-rebalanced LETFs in a volatile sideways market"
 #| fig-pos: "H"
 #| fig-width: 5.5
-#| fig-height: 5.5
+#| fig-height: 4.5
 
 plot_leverage_scenario(sideways_volatile, c("index", "letf_2x_daily", "letf_3x_daily"))
+```
 
-# upward_volatile <- c(100, rep(c(110, 90), 10))
-# plot_leverage_scenario(upward_volatile)
+If the daily returns are volatile but positive (or positive and null), beta slippage will cause the daily-rebalanced LETFs to have a return that surpasses the return of the underlying asset multiplied by the leverage (@fig-2 & @fig-6). In such cases, the compounding is in the investor's interest.
+```{r}
+#| label: fig-6
+#| fig-cap: "Beta slippage with 2x and 3x daily-rebalanced LETFs in a volatile upward market"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 4.5
 
-# downard_stabe <- c(100, rep(c(110, 90), 10))
-# plot_leverage_scenario(downard_stabe)
+upward_volatile <- c(100, cumprod(rep(c(0.01, 0.03), 10) + 1) * 100)
+plot_leverage_scenario(upward_volatile, c("index", "letf_2x_daily", "letf_3x_daily"))
+```
 
-# downard_volatile <- c(100, rep(c(110, 90), 10))
-# plot_leverage_scenario(downard_volatile)
+And in the case of volatile but negative (or negative and null) daily returns, the daily-rebalancing keeps the losses of the LETF below the loss of the underlying asset multiplied by the leverage.
+```{r}
+#| label: fig-7
+#| fig-cap: "Beta slippage with 2x and 3x daily-rebalanced LETFs in a volatile downward market"
+#| fig-pos: "H"
+#| fig-width: 5.5
+#| fig-height: 4.5
+
+upward_volatile <- c(100, cumprod(rep(c(-0.01, -0.03, -0.02), 8) + 1) * 100)
+plot_leverage_scenario(upward_volatile, c("index", "letf_2x_daily", "letf_3x_daily"))
+```
+
+Let *positive beta slippage* describe the situation where a daily-rebalanced LETF of leverage $L$ has a cumulative return that is superior to the cumulative return of the underlying asset multiplied by $L$. And vice versa for *negative beta slippage*. We have seen that beta slippage is positive when the daily returns are positive (or positive and null) and negative one when they are negative (or negative and null). But in practice, daily returns on a stock or index fund fluctuate between negative and positive values. In that case, the beta slippage can be positive or negative depending on the specific path the share price took -- this is path-dependance: it's not only the starting and ending prices of the underlying that dictate the cumulative return, but also the path taken.
+
+
+# MSCI USA's Volatility
+
+```{r}
+msci_usa_usd_eur <- merge(
+    msci_usa,
+    usd_eur,
+    by = "date"
+)[, msci_usa_eur := msci_usa * usd_eur]
+
+vol_plot_dt <- msci_usa_usd_eur[
+    ,
+    .(
+        annualized_volatility = sd(msci_usa_eur / shift(msci_usa_eur) - 1, na.rm = TRUE) * 100 * sqrt(252)
+    ),
+    by = .(year = year(date))
+]
+```
+
+As we've seen, because of beta slippage, the volatility of the underlying asset is a key determinant of the cumulative return of daily-rebalanced LETFs when held for more than a day. @fig-10a shows the annual volatility of the daily changes of the MSCI USA index (net) converted from USD to EUR. Volatility is below 20 % points most years. But we can see multiple peaks above that threshold: following the global financial crisis (2008, `r vol_plot_dt[year == 2008, round(annualized_volatility)]`%), during the Covid crisis (2020, `r vol_plot_dt[year == 2020, round(annualized_volatility)]`%), at the start of the Russo-Ukrainian War (2022, `r vol_plot_dt[year == 2022, round(annualized_volatility)]`%), and following Trump's re-election (2025, `r vol_plot_dt[year == 2025, round(annualized_volatility)]`%), namely. Past observations don't allow us to predict the future but they paint a picture where volatility is mostly low but peaks frequently in response to global incidents.
+
+```{r}
+#| label: fig-10a
+#| fig-cap: "Annual volatility of the daily changes of the MSCI USA index (net, EUR)"
+#| fig-pos: "H"
+
+ggplot(vol_plot_dt, aes(x = year, y = annualized_volatility)) +
+    geom_bar(stat = "identity", fill = "#1f77b4") +
+    labs(
+        title = element_blank(),
+        x = element_blank(),
+        y = "Annualized Volatility (%)",
+        caption = paste0("(", msci_usa_usd_eur[, min(date)], " to ", msci_usa_usd_eur[, max(date)], ")")
+    ) +
+    theme_minimal()
+```
+
+
+# MSCI USA & CL2 Return
+
+```{r}
+compute_cagr <- function(start_value, end_value, trading_days, trading_days_per_year = 252) {
+    ((end_value / start_value)^(trading_days_per_year / trading_days) - 1) * 100
+}
+msci_usa_cagr_2007 <- compute_cagr(
+    start_value = msci_usa_usd_eur[, first(msci_usa_eur)],
+    end_value = msci_usa_usd_eur[, last(msci_usa_eur)],
+    trading_days = msci_usa_usd_eur[!is.na(msci_usa_eur), .N]
+)
+```
+
+@fig-10b shows the cumulative return of the index since 2007-01-01 up to 2025-07-24. Over that pariod, it had a CAGR of `r round(msci_usa_cagr_2007, 1)`%.
+```{r}
+#| label: fig-10b
+#| fig-cap: "Cumuative return of the MSCI USA index (net, EUR)"
+#| fig-pos: "H"
+
+msci_usa_usd_eur[
+    ,
+    cum_return := (msci_usa_eur / first(msci_usa_eur) - 1) * 100
+]
+
+ggplot(msci_usa_usd_eur, aes(x = date, y = cum_return)) +
+    geom_line(color = "#1f77b4") +
+    labs(
+        x = element_blank(),
+        y = "Cumulative Return (%)",
+        caption = paste0("(", msci_usa_usd_eur[, min(date)], " to ", msci_usa_usd_eur[, max(date)], ")")
+    ) +
+    theme_minimal()
+```
+
+```{r}
+msci_usa_cagr <- compute_cagr(
+    start_value = dt[, first(msci_usa * usd_eur)],
+    end_value = dt[, last(msci_usa * usd_eur)],
+    trading_days = dt[!is.na(msci_usa * usd_eur), .N]
+)
+
+cl2_cagr <- compute_cagr(
+    start_value = dt[, first(cl2)],
+    end_value = dt[, last(cl2)],
+    trading_days = dt[!is.na(cl2), .N]
+)
+```
+
+@fig-10c shows the cumulative return of CL2 and of the index (both in EUR) over their shared period of existence. Over this period the index had a CAGR of `r round(msci_usa_cagr, 1)`% and CL2 had a CAGR of `r round(cl2_cagr, 1)`%.
+```{r}
+#| label: fig-10c
+#| fig-cap: "Cumuative return of the MSCI USA index (net, EUR) & of the CL2"
+#| fig-pos: "H"
+
+cum_ret_comp_plot_dt <- dt[
+    ,
+    `:=`(
+        msci_usa_eur_cum_return = (msci_usa * usd_eur / first(msci_usa * usd_eur) - 1) * 100,
+        cl2_cum_return = (cl2 / first(cl2) - 1) * 100
+    )
+] |>
+    melt(
+        id.vars = "date",
+        measure.vars = c("msci_usa_eur_cum_return", "cl2_cum_return"),
+        variable.name = "series",
+        value.name = "cum_return"
+    )
+
+ggplot(cum_ret_comp_plot_dt, aes(x = date, y = cum_return, color = series)) +
+    geom_line() +
+    scale_color_manual(
+        values = c("msci_usa_eur_cum_return" = "#1f77b4", "cl2_cum_return" = "#ff7f0e"),
+        labels = c("msci_usa_eur_cum_return" = "MSCI USA (net, EUR)", "cl2_cum_return" = "CL2")
+    ) +
+    labs(
+        x = element_blank(),
+        y = "Cumulative Return (%)",
+        caption = paste0("(", cum_ret_comp_plot_dt[, min(date)], " to ", cum_ret_comp_plot_dt[, max(date)], ")")
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank()
+    )
+```
+
+From 2020-01-01 to 2025-07-27, @tbl-1 summarizes the risk-adjusted returns of the index and of CL2, each year. (The Sharpe ratios are computed without a risk-free rate.) In 2020, we can see that, due to negative beta slippage from high volatility (34% annualized), CL2 was far from delivering a return near two times the return of the underlying index, hence a lower Sharpe ratio (0.09 vs 0.26). In 2021 though, when volatility was low (13%) and the market was trending up, CL2 improved its Sharpe ratio relative to the unleveraged index -- it more than doubled the return thanks to positive beta slippage. Borrowing costs and fees also play their role. The former peaked in 2024 (around 3.9%, cf. @fig-10) which could contribute to explaining why, despite an upward market and low volatility, the Sharpe ratio was not substantially raised by the LETF relative to the underlying. The latter is constant (0.5% per year). Note that 2025 figures represent annualized returns based on partial year data through July.
+```{r}
+#| label: tbl-1
+#| tbl-cap: "Risk-adjusted returns of the MSCI USA index (net, EUR) & of the CL2"
+#| tbl-pos: "H" 
+
+risk_adj_tbl <- dt[
+    !is.na(msci_usa) & !is.na(cl2) & !is.na(usd_eur) & date %between% c("2020-01-01", "2025-07-27"),
+    .(
+        msci_usa_eur_annualized_return = ((last(msci_usa * usd_eur) / first(msci_usa * usd_eur))^(252/.N) - 1) * 100,
+        cl2_annualized_return = ((last(cl2) / first(cl2))^(252/.N) - 1) * 100,
+        msci_usa_eur_annualized_volatility = sd(msci_usa * usd_eur / shift(msci_usa * usd_eur) - 1, na.rm = TRUE) * 100 * sqrt(252),
+        cl2_annualized_volatility = sd(cl2 / shift(cl2) - 1, na.rm = TRUE) * 100 * sqrt(252)
+    ),
+    by = .(year = year(date))
+][
+    ,
+    `:=`(
+        msci_usa_eur_sharpe_ratio = msci_usa_eur_annualized_return / msci_usa_eur_annualized_volatility,
+        cl2_sharpe_ratio = cl2_annualized_return / cl2_annualized_volatility
+    )
+]
+
+risk_adj_tbl |> 
+    round(2) |>
+    kable(
+        col.names = c("Year", "MSCI USA Annualized Return (%)", "CL2 Annualized Return (%)", "MSCI USA Annualized Volatility (% points)", "CL2 Annualized Volatility (% points)", "MSCI USA Sharpe Ratio", "CL2 Sharpe Ratio")
+    )
 ```
 
 
 # Borrowing cost
 
-```{r}
-
-```
-
-
-# Reconstructing the past price action of CL2
+LETFs rely on borrowing to leverage their position. In the case of CL2, the ESTER is the best proxy of the interest rate paid by the fund as it replaced the Eonia rate reference by the [fund's prospectus](https://www.amundietf.fr/pdfDocuments/prospectus/FR0010755611/FRA/FRA/20250416).
 
 ```{r}
+#| label: fig-10
+#| fig-cap: "Evolution of the ESTER (per month)"
+#| fig-pos: "H"
 
+ggplot(ester, aes(x = date, y = ester)) +
+    geom_line() +
+    labs(
+        x = element_blank(),
+        y = "Rate (%)",
+    ) +
+    theme_minimal()
 ```
 
 
 # Forward simulations of CL2
+## The formula
+
+Based on the work of Avellaneda and Zhang ([2010](https://doi.org/10.1137/090760805)), and of a Reddit contributor ([2024](https://www.reddit.com/r/vosfinances/comments/1czhb3o/partie_1_etf_%C3%A0_effet_de_levier_analyse_et/)) who focused specifically on CL2, we use the following expression for the expected annual return of a long LETF (Equation \ref{eq-main}):
+
+\begin{align}
+\mathbb{E}[R_L] &\approx L \cdot \mu 
+&& \text{(expected return)} \\
+&\quad - \frac{1}{2} L (L - 1) \cdot \sigma^2 
+&& \text{(beta slippage)} \\
+&\quad - (L - 1) \cdot r 
+&& \text{(cost of borrowing)} \\
+&\quad - f 
+&& \text{(fund expense ratio)}
+\label{eq-main}
+\end{align}
+
+Where:
+
+- $L$: leverage factor of the LETF,
+- $\mu$: annualized expected return of the underlying asset,
+- $\sigma$: annualized volatility of the underlying asset,
+- $f$: annual fund expense ratio of the LETF (fees),
+- $r$: annual borrowing interest rate paid by the LETF,
+- $R_L$: expected annual return of the LETF.
 
 ```{r}
-
+compute_letf_expected_return <- function(
+    leverage,
+    underlying_expected_return,
+    underlying_volatility,
+    fund_expense_ratio,
+    borrowing_rate
+) {
+    leverage * underlying_expected_return -
+        (0.5 * leverage * (leverage - 1) * underlying_volatility^2) -
+        ((leverage - 1) * borrowing_rate) -
+        fund_expense_ratio
+}
+# compute_expected_return(
+#     leverage = 2,
+#     underlying_expected_return = 0.07,
+#     underlying_volatility = 0.2,
+#     fund_expense_ratio = 0.005,
+#     borrowing_rate = 0.02
+# )
 ```
 
+Before we use this formula to make forward predictions, let's assess how well it predicts the past annual returns of CL2. @tbl-acc gives the prediction inputs, outputs and predictions errors for each year. @fig-acc-scatter shows the predicted vs. actual annual returns of CL2. And @tbl-acc-sum summarizes the prediction errors across all years.
+
+```{r}
+#| label: tbl-acc
+#| tbl-cap: "Accuracy of the CL2 annual return predictions over the years"
+#| tbl-pos: "H" 
+
+assessment_dt <- copy(dt)[
+    !is.na(cl2) & !is.na(msci_usa) & !is.na(usd_eur) & date %between% c("2020-01-01", "2025-07-27"),
+    `:=`(
+        msci_usa_eur = msci_usa * usd_eur,
+        ester_decimal = ester / 100
+    )
+]
+
+# Daily returns
+assessment_dt[, `:=`(
+    msci_usa_eur_return = msci_usa_eur / shift(msci_usa_eur) - 1,
+    cl2_return = cl2 / shift(cl2) - 1
+)]
+
+# Remove NA (first row)
+assessment_dt <- assessment_dt[!is.na(msci_usa_eur_return)]
+
+# Calculate annual metrics by year
+annual_assessment <- assessment_dt[
+    ,
+    .(
+        # Actual annual returns
+        actual_underlying_return = ((last(msci_usa_eur) / first(msci_usa_eur))^(252/.N) - 1) * 100,
+        actual_cl2_return = ((last(cl2) / first(cl2))^(252/.N) - 1) * 100,
+
+        # Annual volatility of underlying
+        underlying_volatility = sd(msci_usa_eur_return, na.rm = TRUE) * sqrt(252) * 100,
+        
+        # Average annual borrowing rate
+        avg_borrowing_rate = mean(ester_decimal, na.rm = TRUE) * 100
+    ),
+    by = .(year = year(date))
+][
+    # Predicted annual return
+    ,
+    predicted_cl2_return := compute_letf_expected_return(
+        leverage = 2,
+        underlying_expected_return = actual_underlying_return / 100,
+        underlying_volatility = underlying_volatility / 100,
+        fund_expense_ratio = 0.005,
+        borrowing_rate = avg_borrowing_rate / 100
+    ) * 100
+][
+    # Prediction errors
+    ,
+    `:=`(
+        prediction_error = predicted_cl2_return - actual_cl2_return,
+        absolute_error = abs(predicted_cl2_return - actual_cl2_return),
+        relative_error = abs(predicted_cl2_return - actual_cl2_return) / abs(actual_cl2_return) * 100
+    )
+]
+
+setcolorder(annual_assessment, c("year", "actual_underlying_return", "actual_cl2_return", "predicted_cl2_return", "underlying_volatility", "avg_borrowing_rate", "prediction_error", "absolute_error", "relative_error"))
+
+annual_assessment |>
+    signif(3) |>
+    kable(
+        col.names = c(
+            "Year",
+            "Actual Underlying Return (%)", "Actual CL2 Return (%)", "Predicted CL2 Return (%)", "Underlying Volatility (% points)",
+            "Average Borrowing Rate (%)",
+            "Prediction Error (% points)", "Absolute Error (% points)", "Relative Error (%)")
+    )
+```
+
+```{r}
+#| label: fig-acc-scatter
+#| fig-cap: "Predicted vs. Actual CL2 Annual Returns"
+#| fig-pos: "H"
+
+ggplot(annual_assessment, aes(x = actual_cl2_return, y = predicted_cl2_return)) +
+    geom_point(size = 3, alpha = 0.7) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+    geom_text(aes(label = year), hjust = 1.2, vjust = 1.2, size = 3) +
+    labs(
+        x = "Actual CL2 Return (%)",
+        y = "Predicted CL2 Return (%)",
+        caption = "Red dashed line represents perfect prediction"
+    ) +
+    theme_minimal() +
+    coord_fixed()
+```
+
+```{r}
+#| label: tbl-acc-sum
+#| tbl-cap: "Summary of the CL2 annual return predictions"
+#| tbl-pos: "H"
+
+kable(
+    data.frame(
+        mean_abs_error = annual_assessment[, mean(absolute_error, na.rm = TRUE) |> round(2)],
+        root_mean_squared_error = annual_assessment[, sqrt(mean(prediction_error^2, na.rm = TRUE)) |> round(2)],
+        mean_relative_error = annual_assessment[, mean(relative_error, na.rm = TRUE) |> round(2)],
+        correlation = cor(annual_assessment$actual_cl2_return, annual_assessment$predicted_cl2_return, use = "complete.obs") |> round(2)
+    ),
+    col.names = c("Mean Absolute Error (% points)", "Root Mean Square Error (% points)", "Mean Relative Error (%)", "Correlation (actual v. predicted)")
+)
+```
+
+
+## Forward simulations
+```{r}
+plot_letf_expected_returns <- function(
+    underlying_return,
+    leverage = 2,
+    volatility_range = seq(0.1, 0.5, by = 0.05),
+    fund_expense_ratio = 0.005,
+    interest_rate_range = seq(0.01, 0.04, by = 0.005)
+) {
+    plot_data <- CJ(
+        volatility = volatility_range,
+        interest_rate = interest_rate_range
+    )[
+        ,
+        expected_return := mapply(function(vol, rate) {
+            compute_letf_expected_return(
+                leverage = leverage,
+                underlying_expected_return = underlying_return,
+                underlying_volatility = vol,
+                fund_expense_ratio = fund_expense_ratio,
+                borrowing_rate = rate
+            )
+        }, volatility, interest_rate)
+    ]
+    
+    ggplot(plot_data, aes(x = interest_rate * 100, y = volatility * 100, fill = expected_return)) +
+        geom_tile() +
+        geom_text(aes(label = round(expected_return * 100, 1)), color = "black", size = 3) +
+        scale_fill_gradient2(
+            low = "#a60000ff",
+            mid = "white",
+            high = "#0ea600ff",
+            midpoint = underlying_return
+        ) +
+        labs(
+            caption = paste0(
+                "Underlying Return: ", underlying_return * 100,
+                "%, Leverage Factor: ",
+                leverage, ", Fund Expense Ratio: ",
+                fund_expense_ratio * 100, "%"
+            ),
+            x = "Interest Rate (%)",
+            y = "Volatility (% points)"
+        ) +
+        theme_minimal() +
+        theme(legend.position = "none")
+}
+```
+
+```{r}
+#| label: fig-fwd-10
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with an expected return of 10%"
+#| fig-pos: "H" 
+
+plot_letf_expected_returns(underlying_return = 0.1)
+```
+
+```{r}
+#| label: fig-fwd-7
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with an expected return of 7%"
+#| fig-pos: "H" 
+
+plot_letf_expected_returns(underlying_return = 0.07)
+```
+
+```{r}
+#| label: fig-fwd-5
+#| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with an expected return of 5%"
+#| fig-pos: "H" 
+
+plot_letf_expected_returns(underlying_return = 0.05)
+```
 
 # Conclusions
 

@@ -4,15 +4,17 @@ author: "Konilo Zio"
 date: "`r Sys.time()`"
 toc: true
 format: 
-  html:
-    code-fold: true
+  pdf:
+    toc: true
     number-sections: true
-    toc-expand: true
-    toc-depth: 5
-    code-tools: true
+    colorlinks: true
+    papersize: a4
+execute:
+    echo: false
 ---
 
-```{r setup}
+```{r}
+#| label: setup
 #| echo: false
 #| output: false
 
@@ -21,7 +23,17 @@ t0 <- proc.time()
 
 # required packages
 library(data.table)
-library(plotly)
+library(ggplot2)
+library(scales)
+
+# Runs when executing R interactively (because app/ is the workdir),
+# but not when rendering the qmd (because the qmd's dir is the workdir in that case)
+if (getwd() == "/app") {
+    setwd("sandbox/leveraged_etfs")
+    library(httpgd)
+    httpgd::hgd()
+    # Plots will be displayed via a web page whose URL will be printed be the function above
+}
 ```
 
 
@@ -100,27 +112,34 @@ project_no_return_pf <- function(age_start, age_stop, monthly_savings, discount_
 
 dt <- project_no_return_pf(23, 65, 1000, 0.01)
 
-# Update colors for SP and TP/CVFS in plots
-plot_ly(
-    data = dt,
-    x = ~age,
-    y = ~sp,
-    type = "bar",
-    name = "Savings Portfolio",
-    marker = list(color = "#1f77b4")
-) |>
-    add_trace(
-        y = ~cvfs,
-        name = "Current Value of Future Savings",
-        marker = list(color = "#ff7f0e")
-    ) |>
-    layout(
-        barmode = "stack",
-        title = "",
-        xaxis = list(title = "Age"),
-        yaxis = list(title = "Portfolio Value"),
-        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2),
-        hovermode = "x"
+dt_long <- melt(
+    dt,
+    id.vars = "age",
+    measure.vars = c("sp", "cvfs"),
+    variable.name = "component",
+    value.name = "amount"
+)
+
+ggplot(data = dt_long, aes(x = age, y = amount, fill = component)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(
+        name = "Portfolio Components",
+        values = c("sp" = "#1f77b4", "cvfs" = "#ff7f0e"),
+        labels = c("sp" = "Savings Portfolio", "cvfs" = "Current Value of Future Savings")
+    ) +
+    # Prevent scientific notation
+    scale_y_continuous(
+        labels = label_number(scale = 1, big.mark = ",")
+    ) +
+    labs(
+        title = "Total Portfolio Over Life",
+        x = "Age",
+        y = "Portfolio Value"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank()
     )
 ```
 
@@ -154,23 +173,28 @@ dt[
     stocks_share_tp_appl_tp := stocks_owned_appl_tp / tp
 ]
 
-plot_ly(data = dt, x = ~age) |>
-    add_lines(
-        y = ~ stocks_share_tp_appl_sp * 100,
-        name = "Stocks % in Total Portfolio When Merton-Samuelson Share Applied to Savings Portfolio",
-        line = list(color = "#1f77b4")
-    ) |>
-    add_lines(
-        y = ~ stocks_share_tp_appl_tp * 100,
-        name = "Stocks % in Total Portfolio When Merton-Samuelson Share Applied to Total Portfolio",
-        line = list(color = "#ff7f0e")
-    ) |>
-    layout(
-        title = "",
-        xaxis = list(title = "Age"),
-        yaxis = list(title = "Stocks Share"),
-        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2),
-        hovermode = "x"
+ggplot(data = dt, aes(x = age)) +
+    geom_line(
+        aes(y = stocks_share_tp_appl_sp * 100, color = "Savings Portfolio"),
+        linewidth = 1
+    ) +
+    geom_line(
+        aes(y = stocks_share_tp_appl_tp * 100, color = "Total Portfolio"),
+        linewidth = 1
+    ) +
+    scale_color_manual(
+        name = "Allocation Method",
+        values = c("Savings Portfolio" = "#1f77b4", "Total Portfolio" = "#ff7f0e")
+    ) +
+    labs(
+        title = "Asset Class Allocation Over Life",
+        x = "Age",
+        y = "Stocks Share (%)"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank()
     )
 ```
 
@@ -208,30 +232,51 @@ temp_div_dt <- dt[
     )
 ]
 
-plot_ly(
-    data = temp_div_dt,
-    x = ~age_bin,
-    y = ~ share_tot_stocks_euro_months_appl_sp * 100,
-    type = "bar",
-    name = "Merton-Samuelson Share Applied to Savings Portfolio",
-    marker = list(color = "#1f77b4")
-) |>
-    add_trace(
-        y = ~ share_tot_stocks_euro_months_appl_tp * 100,
-        name = "Merton-Samuelson Share Applied to Total Portfolio",
-        marker = list(color = "#ff7f0e")
-    ) |>
-    add_trace(
-        y = ~ ideal_share_tot_stocks_euro_months * 100,
-        name = "Perfect Temporal Diversification",
-        marker = list(color = "#2ca02c")
-    ) |>
-    layout(
-        title = "",
-        xaxis = list(title = paste0("Age (", years_step, "-year bins)")),
-        yaxis = list(title = "Share of Working Life Stocks Euro-months"),
-        legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2),
-        hovermode = "x"
+temp_div_dt_long <- melt(
+    temp_div_dt,
+    id.vars = "age_bin",
+    measure.vars = c(
+        "share_tot_stocks_euro_months_appl_sp",
+        "share_tot_stocks_euro_months_appl_tp",
+        "ideal_share_tot_stocks_euro_months"
+    ),
+    variable.name = "method",
+    value.name = "share"
+)
+
+temp_div_dt_long[, method := factor(
+    method,
+    levels = c(
+        "share_tot_stocks_euro_months_appl_sp",
+        "share_tot_stocks_euro_months_appl_tp",
+        "ideal_share_tot_stocks_euro_months"
+    ),
+    labels = c(
+        "Merton-Samuelson Share Applied to Savings Portfolio",
+        "Merton-Samuelson Share Applied to Total Portfolio",
+        "Perfect Temporal Diversification"
+    )
+)]
+
+ggplot(data = temp_div_dt_long, aes(x = age_bin, y = share * 100, fill = method)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    scale_fill_manual(
+        name = "Method",
+        values = c(
+            "Merton-Samuelson Share Applied to Savings Portfolio" = "#1f77b4",
+            "Merton-Samuelson Share Applied to Total Portfolio" = "#ff7f0e",
+            "Perfect Temporal Diversification" = "#2ca02c"
+        )
+    ) +
+    labs(
+        title = "Exposition to Stocks Over Life",
+        x = paste0("Age (", years_step, "-year bins)"),
+        y = "Share of Working Life Stocks Euro-months (%)"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = "bottom",
+        legend.title = element_blank()
     )
 
 stocks_expo_unsmoothness_appl_sp <- temp_div_dt[
@@ -263,5 +308,11 @@ Ayres & Nalebuff ([2010](https://www.amazon.com/gp/product/0465018297)) advocate
 
 This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
 ```{r}
-print(sessionInfo(), locale = FALSE)
+#| label: appendix
+
+print(sessionInfo(), locale = FALSE) |>
+    capture.output() |>
+    strwrap(width = 70, simplify = FALSE) |>
+    unlist() |>
+    cat(sep = "\n")
 ```

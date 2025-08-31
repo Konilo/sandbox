@@ -9,6 +9,7 @@
         "quarto.quarto",
         "rdebugger.r-debugger",
         "reditorsupport.r",
-        "reditorsupport.r-syntax"
+        "reditorsupport.r-syntax",
+        "ms-toolsai.jupyter"
     ]
 }

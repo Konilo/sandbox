@@ -514,7 +514,7 @@ msci_usa_cagr_2007 <- compute_cagr(
 @fig-10b shows the cumulative return of the index since 2007-01-01 up to 2025-07-24. Over that pariod, it had a CAGR of `r round(msci_usa_cagr_2007, 1)`%.
 ```{r}
 #| label: fig-10b
-#| fig-cap: "Cumuative return of the MSCI USA index (net, EUR)"
+#| fig-cap: "Cumulative return of the MSCI USA index (net, EUR)"
 #| fig-pos: "H"
 
 msci_usa_usd_eur[
@@ -549,7 +549,7 @@ cl2_cagr <- compute_cagr(
 @fig-10c shows the cumulative return of CL2 and of the index (both in EUR) over their shared period of existence. Over this period the index had a CAGR of `r round(msci_usa_cagr, 1)`% and CL2 had a CAGR of `r round(cl2_cagr, 1)`%.
 ```{r}
 #| label: fig-10c
-#| fig-cap: "Cumuative return of the MSCI USA index (net, EUR) & of the CL2"
+#| fig-cap: "Cumulative return of the MSCI USA index (net, EUR) & of the CL2"
 #| fig-pos: "H"
 
 cum_ret_comp_plot_dt <- dt[

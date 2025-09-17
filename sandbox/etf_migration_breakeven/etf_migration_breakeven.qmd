@@ -27,6 +27,7 @@ t0 <- proc.time()
 # required packages
 library(data.table)
 library(ggplot2)
+library(knitr)
 
 # Runs when executing R interactively (because app/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
@@ -41,11 +42,11 @@ if (getwd() == "/app") {
 
 # Introduction
 
-Exchange traded funds (ETFs) track the price of a set of underlying assets such as stocks or commodities. Some underlying assets are covered by several different ETFs like the S&P 500 or the MSCI World indexes. In this case, while the underlying is virtually identical from on ETF to the next, the total expense ratios (TERs) of the ETFs vary: some ETFs collect less fees than others -- they are "cheaper" -- effectively provding more returns after accounting for the TER.
+Exchange traded funds (ETFs) track the price of a set of underlying assets such as stocks or commodities. Some underlyings -- like the S&P 500 or the MSCI World indexes -- are covered by several different ETFs. In this case, while the underlying is virtually identical from one ETF to the other, the total expense ratios (TERs) of the ETFs vary: some ETFs collect (yearly) less fees than others -- they are "cheaper" -- effectively provding more returns after accounting for the TER.
 
-If an investor happens to own shares in an ETF while a cheaper ETF exists for the same underlying, it may make sense to sell the former and but the latter with the resulting cash. Each order (buy or sell) is subjected to a fee (the order fee) by the broker. This fee is a key parameter to determine if one should migrate to the cheap ETF or stay invested in the more expensive one: the saved fund expenses must offset the fees incurred when selling and buying. Using the ETFs TER, the order fee, and the expected yearly return of the underlying asset (before fund fees), we can compute the amount of time necessary to make the migration breakeven with the situation where the more expensive ETF is kept.
+If an investor happens to own shares in an ETF while a cheaper ETF exists for the same underlying, it may make sense to sell the former and buy the latter with the resulting cash. Each order (buy or sell) is subjected to a fee by the broker -- the order fee. This fee is a key parameter to determine if one should migrate to the cheap ETF or stay invested in the more expensive one: the saved fund expenses must offset the fees incurred when selling and buying for the migration to make sense. Using the ETFs TER, the order fee, and the expected yearly return of the underlying asset (before fund fees), we can compute the amount of time necessary to make a migration scenario breakeven with a scenario where no migration is carried out.
 
-Herein, we will focus on the ETFs presented in @tbl-etfs. Both track the MSCI Daily Net TR World Euro index and are managed by Amundi. CW8 is historical, more expensive ETF while DCAM was introduced more recently and has a lower TER.
+Herein, we will focus on the ETFs presented in @tbl-etfs. Both track the MSCI Daily Net TR World Euro index. CW8 is an historical, more expensive ETF while DCAM was introduced more recently and has a lower TER. We will consider an order fee of 0.35%.
 
 | ETF Ticker | ETF Name | TER |
 |---|---|---|
@@ -54,11 +55,11 @@ Herein, we will focus on the ETFs presented in @tbl-etfs. Both track the MSCI Da
 : Focal ETFs of this paper {#tbl-etfs}
 
 
-# A formula for each scenario
+# A formula for each scenario {#sec-each}
 
 We will make formulas to compute the resulting capital in each of the two scenario using the following variables:
 
-- $years$ = number of years until the investment stops (i.e., until the investors sells)
+- $years$ = investment horizon
 - $\text{TER}_\text{expensive ETF}$ = TER of the more expensive ETF
 - $\text{TER}_\text{cheap ETF}$ = TER of the cheaper ETF
 - $\text{yearly return}$ = expected yearly return of the underlying asset (before fund fees)
@@ -86,7 +87,7 @@ staying_in_expensive_etf <- function(
     value_0 * (1 + yearly_return - ter_expensive_etf)^years
 }
 
-outcome_staying <- staying_in_expensive_etf(
+outcome_staying_100 <- staying_in_expensive_etf(
     years = 40,
     ter_expensive_etf = .0038,
     yearly_return = .07,
@@ -94,7 +95,7 @@ outcome_staying <- staying_in_expensive_etf(
 )
 ```
 
-With an initial value ($value_0$) of €100 and a yearly return arbitrarily set at 7%, staying invested in CW8 (TER = 0.38%) leads to a capital of €`r round(outcome_staying)` after 40 years.
+With an initial value ($value_0$) of €100 and a yearly return arbitrarily set at 7%, staying invested in CW8 (TER = 0.38%) leads to a capital of €`r round(outcome_staying_100)` after 40 years.
 
 
 ## Migrating to the cheaper ETF
@@ -118,7 +119,7 @@ migrating_to_cheap_etf <- function(
     value_0 * (1 - order_fee)^2 * (1 + yearly_return - ter_cheap_etf)^years
 }
 
-outcome_migrating <- migrating_to_cheap_etf(
+outcome_migrating_100 <- migrating_to_cheap_etf(
     years = 40,
     ter_cheap_etf = .002,
     yearly_return = .07,
@@ -127,7 +128,7 @@ outcome_migrating <- migrating_to_cheap_etf(
 )
 ```
 
-With the same initial value, yearly return, and investment horizon, migrating from CW8 (TER = 0.38%) to DCAM (TER = 0.20%) leads to a capital of €`r round(outcome_migrating)`.
+With the same initial value, yearly return, and investment horizon, migrating from CW8 (TER = 0.38%) to DCAM (TER = 0.20%) leads to a capital of €`r round(outcome_migrating_100)`.
 
 
 # Breaking even
@@ -135,7 +136,7 @@ With the same initial value, yearly return, and investment horizon, migrating fr
 
 In practice, what we want is to know what minimal investment horizon is needed for the migration to be financially advantageous. We need to compute the outcome of each scenario for varying $years$ values (all other things being equal) and observe the sign of the difference.
 
-Still with an initial value of €100 and a yearly return arbitrarily set at 7%, @fig-graph-resol shows that the migrating becomes financially advantageous after a little more than 4 years. After 10 years, the final value of the investment is almost 2% higher if one migrates. After 40 years, the difference amounts to `r round((outcome_migrating - outcome_staying) / outcome_staying * 100, 2)`%.
+Still with an initial value of €100 and a yearly return arbitrarily set at 7%, @fig-graph-resol shows that migrating becomes financially advantageous after a little more than 4 years.
 ```{r}
 #| label: fig-graph-resol
 #| fig-cap: "Graphical resolution"
@@ -144,33 +145,49 @@ Still with an initial value of €100 and a yearly return arbitrarily set at 7%,
 #| fig-height: 4.5
 
 plot_dt <- data.table(
-    years = 1:10
+    years = 1:40
 )
 plot_dt <- plot_dt[
     ,
     `:=`(
-        outcome_staying = staying_in_expensive_etf(
+        outcome_staying_100 = staying_in_expensive_etf(
             years = years,
             ter_expensive_etf = .0038,
             yearly_return = .07,
             value_0 = 100
         ),
-        outcome_migrating = migrating_to_cheap_etf(
+        outcome_migrating_100 = migrating_to_cheap_etf(
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .07,
             order_fee = .0035,
             value_0 = 100
+        ),
+        outcome_staying_20k = staying_in_expensive_etf(
+            years = years,
+            ter_expensive_etf = .0038,
+            yearly_return = .07,
+            value_0 = 20000
+        ),
+        outcome_migrating_20k = migrating_to_cheap_etf(
+            years = years,
+            ter_cheap_etf = .002,
+            yearly_return = .07,
+            order_fee = .0035,
+            value_0 = 20000
         )
     )
 ][
     ,
-    delta := outcome_migrating - outcome_staying
+    `:=`(
+        delta_100 = outcome_migrating_100 - outcome_staying_100,
+        delta_20000 = outcome_migrating_20k - outcome_staying_20k
+    )
 ]
 
 x_breaks <- seq(plot_dt[, min(years)], plot_dt[, max(years)])
 
-ggplot(plot_dt, aes(x = years, y = delta)) +
+ggplot(plot_dt[years %between% c(1, 10)], aes(x = years, y = delta_100)) +
     geom_line() +
     geom_point() +
     geom_hline(
@@ -182,7 +199,7 @@ ggplot(plot_dt, aes(x = years, y = delta)) +
     ) +
     labs(
         x = "Years",
-        y = "Outcome Difference (Migrating Minus Staying, EUR)"
+        y = "Final Capital Difference (Migrating Minus Staying, EUR)"
     ) +
     theme_minimal() +
     labs(
@@ -190,10 +207,81 @@ ggplot(plot_dt, aes(x = years, y = delta)) +
     )
 ```
 
+@tbl-gains-horiz-7 shows the added capital gain caused by the migration relative to the scenario where the investor stays invested in the more expensive ETF. Further down, @eq-eq-resol will demonstrate that the initial value has no impact on the added final capital gain (in %) -- which why this metric is only computed once for both initial values in @tbl-gains-horiz-7 & @tbl-gains-horiz-5.
+```{r}
+#| label: tbl-gains-horiz-7
+#| tbl-cap: "Gain from migrating to the cheaper ETF depending on the investment horizon (yearly return = 7%)"
+#| tbl-pos: "H"
+
+plot_dt[
+    years %in% c(4, 10, 20, 30, 40),
+    .(
+        "Investment Horizon (years)" = years,
+        "Final Capital Difference (Initial Value = 100, EUR)" = (outcome_migrating_100 - outcome_staying_100) |> round(2),
+        "Final Capital Difference (Initial Value = 20000, EUR)" = (outcome_migrating_20k - outcome_staying_20k) |> round(2),
+        "Added Final Capital Gain If One Migrates (%)" = ((outcome_migrating_100 - outcome_staying_100) / outcome_staying_100 * 100) |> round(2)
+    )
+] |> kable()
+```
+
+@tbl-gains-horiz-5 presents the same information but using a yearly return of 5% instead of 7%. When the yearly return is lowered, the number of years to breakeven decreases as well and the added capital gain caused by the migration (in %) increases. The order of magnitude remains the same, though.
+```{r}
+#| label: tbl-gains-horiz-5
+#| tbl-cap: "Gain from migrating to the cheaper ETF depending on the investment horizon (yearly return = 5%)"
+#| tbl-pos: "H"
+
+dt_5 <- data.table(
+    years = c(4, 10, 20, 30, 40)
+)
+plodt_5t_dt <- dt_5[
+    ,
+    `:=`(
+        outcome_staying_100 = staying_in_expensive_etf(
+            years = years,
+            ter_expensive_etf = .0038,
+            yearly_return = .05,
+            value_0 = 100
+        ),
+        outcome_migrating_100 = migrating_to_cheap_etf(
+            years = years,
+            ter_cheap_etf = .002,
+            yearly_return = .05,
+            order_fee = .0035,
+            value_0 = 100
+        ),
+        outcome_staying_20k = staying_in_expensive_etf(
+            years = years,
+            ter_expensive_etf = .0038,
+            yearly_return = .05,
+            value_0 = 20000
+        ),
+        outcome_migrating_20k = migrating_to_cheap_etf(
+            years = years,
+            ter_cheap_etf = .002,
+            yearly_return = .05,
+            order_fee = .0035,
+            value_0 = 20000
+        )
+    )
+]
+
+dt_5[
+    ,
+    .(
+        "Investment Horizon (years)" = years,
+        "Final Capital Difference (Initial Value = 100, EUR)" = (outcome_migrating_100 - outcome_staying_100) |> round(2),
+        "Final Capital Difference (Initial Value = 20000, EUR)" = (outcome_migrating_20k - outcome_staying_20k) |> round(2),
+        "Added Final Capital Gain If One Migrates (%)" = ((outcome_migrating_100 - outcome_staying_100) / outcome_staying_100 * 100) |> round(2)
+    )
+] |> kable()
+```
+
+@fig-graph-resol, @tbl-gains-horiz-7, and @tbl-gains-horiz-5 show that the added capital gain caused by the migration (in %) increases with the investment horizon. This is due to compounding. Migrating makes sense whenever the investment horizon surpasses a certain threshold, but it also continues making more and more sense when the horizon is increased while already over the threshold. The more investment time horizon, the more migrating is important.
+
 
 ## Equational resolution
 
-Graphical resolution works but it is inaccurate and requires more computation than necessary. Equational resolution will provide us with a precise solution. @eq-eq-resol is the resolution without numerical substitution.
+Graphical resolution works but it is inaccurate and requires more computation than necessary. Equational resolution will provide us with a precise solution. @eq-eq-resol is the resolution without numerical substitution. Note that $value_0$ has no play in the final formula.
 $$
 \begin{multlined}
 \text{value}_0 \times (1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years} = \\ \text{value}_0 \times (1 - \text{order fee})^2 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
@@ -241,7 +329,7 @@ breakeven_years <- find_breakeven_years(
 )
 ```
 
-After numerical substitution with the same parameters, we measure that the number of years to breakeven is `r round(breakeven_years, 2)`.
+After numerical substitution with the same parameters presented in @sec-each, we measure that the number of years to breakeven is `r round(breakeven_years, 2)`.
 
 
 # Appendix

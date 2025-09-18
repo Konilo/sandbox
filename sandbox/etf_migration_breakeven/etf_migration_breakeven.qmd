@@ -2,7 +2,6 @@
 title: "When to Migrate Away From an Expensive ETF to a Cheaper, Equivalent One?"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
-toc: true
 format: 
   pdf:
     toc: true
@@ -87,15 +86,15 @@ staying_in_expensive_etf <- function(
     value_0 * (1 + yearly_return - ter_expensive_etf)^years
 }
 
-outcome_staying_100 <- staying_in_expensive_etf(
+example_staying_20k <- staying_in_expensive_etf(
     years = 40,
     ter_expensive_etf = .0038,
     yearly_return = .07,
-    value_0 = 100
+    value_0 = 20000
 )
 ```
 
-With an initial value ($value_0$) of €100 and a yearly return arbitrarily set at 7%, staying invested in CW8 (TER = 0.38%) leads to a capital of €`r round(outcome_staying_100)` after 40 years.
+With an initial value ($value_0$) of 20 k€ and a yearly return arbitrarily set at 7%, staying invested in CW8 (TER = 0.38%) leads to a capital of €`r format(example_staying_20k, big.mark = " ")` after 40 years.
 
 
 ## Migrating to the cheaper ETF
@@ -119,16 +118,16 @@ migrating_to_cheap_etf <- function(
     value_0 * (1 - order_fee)^2 * (1 + yearly_return - ter_cheap_etf)^years
 }
 
-outcome_migrating_100 <- migrating_to_cheap_etf(
+example_migrating_20k <- migrating_to_cheap_etf(
     years = 40,
     ter_cheap_etf = .002,
     yearly_return = .07,
     order_fee = .0035,
-    value_0 = 100
+    value_0 = 20000
 )
 ```
 
-With the same initial value, yearly return, and investment horizon, migrating from CW8 (TER = 0.38%) to DCAM (TER = 0.20%) leads to a capital of €`r round(outcome_migrating_100)`.
+With the same parameters, migrating from CW8 (TER = 0.38%) to DCAM (TER = 0.20%) leads to a capital of €`r format(example_migrating_20k, big.mark = " ")`.
 
 
 # Breaking even
@@ -136,7 +135,7 @@ With the same initial value, yearly return, and investment horizon, migrating fr
 
 In practice, what we want is to know what minimal investment horizon is needed for the migration to be financially advantageous. We need to compute the outcome of each scenario for varying $years$ values (all other things being equal) and observe the sign of the difference.
 
-Still with an initial value of €100 and a yearly return arbitrarily set at 7%, @fig-graph-resol shows that migrating becomes financially advantageous after a little more than 4 years.
+Still with an initial value of 20 k€ and a yearly return arbitrarily set at 7%, @fig-graph-resol shows that migrating becomes financially advantageous after a little more than 4 years.
 ```{r}
 #| label: fig-graph-resol
 #| fig-cap: "Graphical resolution"
@@ -150,18 +149,18 @@ plot_dt <- data.table(
 plot_dt <- plot_dt[
     ,
     `:=`(
-        outcome_staying_100 = staying_in_expensive_etf(
+        outcome_staying_5k = staying_in_expensive_etf(
             years = years,
             ter_expensive_etf = .0038,
             yearly_return = .07,
-            value_0 = 100
+            value_0 = 5000
         ),
-        outcome_migrating_100 = migrating_to_cheap_etf(
+        outcome_migrating_5k = migrating_to_cheap_etf(
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .07,
             order_fee = .0035,
-            value_0 = 100
+            value_0 = 5000
         ),
         outcome_staying_20k = staying_in_expensive_etf(
             years = years,
@@ -180,14 +179,13 @@ plot_dt <- plot_dt[
 ][
     ,
     `:=`(
-        delta_100 = outcome_migrating_100 - outcome_staying_100,
-        delta_20000 = outcome_migrating_20k - outcome_staying_20k
+        delta_20k = outcome_migrating_20k - outcome_staying_20k
     )
 ]
 
 x_breaks <- seq(plot_dt[, min(years)], plot_dt[, max(years)])
 
-ggplot(plot_dt[years %between% c(1, 10)], aes(x = years, y = delta_100)) +
+ggplot(plot_dt[years %between% c(1, 10)], aes(x = years, y = delta_20k)) +
     geom_line() +
     geom_point() +
     geom_hline(
@@ -217,9 +215,9 @@ plot_dt[
     years %in% c(4, 10, 20, 30, 40),
     .(
         "Investment Horizon (years)" = years,
-        "Final Capital Difference (Initial Value = 100, EUR)" = (outcome_migrating_100 - outcome_staying_100) |> round(2),
-        "Final Capital Difference (Initial Value = 20000, EUR)" = (outcome_migrating_20k - outcome_staying_20k) |> round(2),
-        "Added Final Capital Gain If One Migrates (%)" = ((outcome_migrating_100 - outcome_staying_100) / outcome_staying_100 * 100) |> round(2)
+        "Final Capital Difference (Initial Value = 5 000, EUR)" = (outcome_migrating_5k - outcome_staying_5k) |> round(2),
+        "Final Capital Difference (Initial Value = 20 000, EUR)" = (outcome_migrating_20k - outcome_staying_20k) |> round(2),
+        "Added Final Capital Gain If One Migrates (%)" = ((outcome_migrating_5k - outcome_staying_5k) / outcome_staying_5k * 100) |> round(2)
     )
 ] |> kable()
 ```
@@ -236,18 +234,18 @@ dt_5 <- data.table(
 plodt_5t_dt <- dt_5[
     ,
     `:=`(
-        outcome_staying_100 = staying_in_expensive_etf(
+        outcome_staying_5k = staying_in_expensive_etf(
             years = years,
             ter_expensive_etf = .0038,
             yearly_return = .05,
-            value_0 = 100
+            value_0 = 5000
         ),
-        outcome_migrating_100 = migrating_to_cheap_etf(
+        outcome_migrating_5k = migrating_to_cheap_etf(
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .05,
             order_fee = .0035,
-            value_0 = 100
+            value_0 = 5000
         ),
         outcome_staying_20k = staying_in_expensive_etf(
             years = years,
@@ -269,9 +267,9 @@ dt_5[
     ,
     .(
         "Investment Horizon (years)" = years,
-        "Final Capital Difference (Initial Value = 100, EUR)" = (outcome_migrating_100 - outcome_staying_100) |> round(2),
-        "Final Capital Difference (Initial Value = 20000, EUR)" = (outcome_migrating_20k - outcome_staying_20k) |> round(2),
-        "Added Final Capital Gain If One Migrates (%)" = ((outcome_migrating_100 - outcome_staying_100) / outcome_staying_100 * 100) |> round(2)
+        "Final Capital Difference (Initial Value = 5 000, EUR)" = (outcome_migrating_5k - outcome_staying_5k) |> round(2),
+        "Final Capital Difference (Initial Value = 20 000, EUR)" = (outcome_migrating_20k - outcome_staying_20k) |> round(2),
+        "Added Final Capital Gain If One Migrates (%)" = ((outcome_migrating_5k - outcome_staying_5k) / outcome_staying_5k * 100) |> round(2)
     )
 ] |> kable()
 ```

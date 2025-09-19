@@ -41,7 +41,7 @@ if (getwd() == "/app") {
 
 # Introduction
 
-Exchange traded funds (ETFs) track the price of a set of underlying assets such as stocks or commodities. Some underlyings -- like the S&P 500 or the MSCI World indexes -- are covered by several different ETFs. In this case, while the underlying is virtually identical from one ETF to the other, the total expense ratios (TERs) of the ETFs vary: some ETFs collect (yearly) less fees than others -- they are "cheaper" -- effectively provding more returns after accounting for the TER.
+Exchange traded funds (ETFs) track the price of a set of underlying assets such as stocks or commodities. Some underlyings -- like the S&P 500 or the MSCI World indexes -- are covered by several different ETFs. In this case, while the underlying is virtually identical from one ETF to the other, the total expense ratios (TERs) of the ETFs vary: some ETFs collect less yearly fees than others -- they are "cheaper" -- effectively provding more returns after accounting for the TER.
 
 If an investor happens to own shares in an ETF while a cheaper ETF exists for the same underlying, it may make sense to sell the former and buy the latter with the resulting cash. Each order (buy or sell) is subjected to a fee by the broker -- the order fee. This fee is a key parameter to determine if one should migrate to the cheap ETF or stay invested in the more expensive one: the saved fund expenses must offset the fees incurred when selling and buying for the migration to make sense. Using the ETFs TER, the order fee, and the expected yearly return of the underlying asset (before fund fees), we can compute the amount of time necessary to make a migration scenario breakeven with a scenario where no migration is carried out.
 

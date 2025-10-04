@@ -9,6 +9,7 @@ Studies coded with R, Python, and [Quarto](https://quarto.org/), developed in a 
 - [Artprice100](https://github.com/Konilo/sandbox/tree/main/sandbox/artprice100/artprice100.pdf): a basic financial analysis of the Artprice100 index.
 - [Leveraged ETFs &ndash; The Case Of CL2](https://github.com/Konilo/sandbox/tree/main/sandbox/leveraged_etfs/leveraged_etfs.pdf): a study of daily-rebalanced leveraged ETFs and an outlook on CL2's relevance for long-term investors.
 - [When to Migrate Away From an Expensive ETF to a Cheaper, Equivalent One?](https://github.com/Konilo/sandbox/tree/main/sandbox/etf_migration_breakeven/etf_migration_breakeven.pdf): determining when migrating from an ETF to another, equivalent ETF with a lower total expense ratio is financially advantageous.
+- [Holding Cash or Investing in a Money Market Fund Between Trades?](https://github.com/Konilo/sandbox/tree/main/sandbox/etf_migration_breakeven/cash_or_mmf_between_trades.pdf): determining when investing liquidities in a money market fund is more advantageous than hold them as cash during inter-trade periods.
 
 
 ## Setup and reproduction of the results

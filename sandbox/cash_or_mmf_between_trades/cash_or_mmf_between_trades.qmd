@@ -1,0 +1,148 @@
+---
+title: "Holding Cash or Investing in a Money Market Fund Between Trades?"
+author: "Konilo Zio"
+date: "`r Sys.time()`"
+format: 
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    papersize: a4
+execute:
+    echo: false
+---
+
+```{r}
+#| label: setup
+#| echo: false
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(ggplot2)
+library(knitr)
+
+# Runs when executing R interactively (because app/ is the workdir),
+# but not when rendering the qmd (because the qmd's dir is the workdir in that case)
+if (getwd() == "/app") {
+    setwd("sandbox/cash_or_mmf_between_trades")
+    library(httpgd)
+    httpgd::hgd()
+    # Plots will be displayed via a web page whose URL will be printed be the function above
+}
+```
+
+
+# Introduction
+
+Engage in active trading at your own risk. If you do, you will probably face the need to manage liquidities between trades. There are (at least) two options: (i) keeping those liquidities as cash (providing return) or (ii) investing them (yielding some returns) while waiting for the next trade. The choice depends on:
+
+- the order fees: with option i, you have to place two market orders vs. zero with option ii;
+- on the expected yield of the asset in which you would invest in option ii: this yield is what could potentially compensate the order fees and, hopefully bring added profit;
+- and on the inter-trade duration: the longer the period, the more the asset in ii has time to appreciate.
+
+This study aims at computing the inter-trade duration necessary to breakeven between the two options.
+
+The asset in option ii will be called the "risk-off asset". Herein, we will focus on money market funds (MMFs) available in the French [Plan Epargne en Action (PEA)](https://www.economie.gouv.fr/particuliers/gerer-mon-argent/gerer-mon-budget-et-mon-epargne/quest-ce-que-le-plan-depargne-en). But adjusting the expected yield allows any risk-off asset to be modeled.
+
+
+# Expected return of the risk-off asset
+
+MMFs available in the PEA generally track the [Euro short-term rate (€STR)](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html). @tbl-mmfs provides two examples of such funds. Note that, depending on the broker, some MMFs can be traded without order fees.
+
+| Name | Target | Total expense ratio |
+|---|---|---|
+| [AXA PEA Régularité Capitalisation EUR](https://fonds.axa-im.fr/fr/particuliers/fund/axa-pea-regularite-capitalisation-eur/#overview) | Capitalized €STR + 8.5 bps - fund expenses | 0.23% |
+| [LCL SERENITE PEA (C)](https://opc.lcl.fr/fra/fr/particulier/products/FR0007059670) | Capitalized €STR - fund expenses | 0.27% |
+: Examples of money market funds availble on the PEA {#tbl-mmfs}
+
+So the expected €STR is the determining factor for the expected return of our risk-off asset. While no one knows what its future value will be, for the sake of this study, we can pick a plausible value based on [past returns](https://www.boursorama.com/bourse/taux/cours/1xESTER/). We will go for 2% net of fees per year.
+
+
+# Solving the equation
+
+The breakeven between the two scenarios involves the following variables:
+
+- $\text{days}$ = inter-trade duration in trading days
+- $\text{daily return}$ = expected net daily return of the risk-off asset
+- $\text{order fee}$ = order fee applied to buy and sell orders by the broker
+- $\text{cash}$ = initial amount of liquidities (cash) to manage with either option
+
+@eq-break models the problem and finds the formula to compute the number of \text{days} necessary to breakeven.
+$$
+\text{cash} = \text{cash} (1 - \text{order fee}) (1 + \text{daily return})^\text{days} (1 - \text{order fee})
+$$ {#eq-break}
+
+$$
+1 = (1 - \text{order fee})^2 (1 + \text{daily return})^\text{days}
+$$
+
+$$
+(1 + \text{daily return})^\text{days} = \frac{1}{(1 - \text{order fee})^2}
+$$
+
+$$
+\text{days} = \log_{1 + \text{daily return}} \frac{1}{(1 - \text{order fee})^2}
+% https://www.mathsisfun.com/algebra/exponents-logarithms.html
+$$
+
+
+@fig-matrix conducts the numerical substitution with various order fee (0 or 0.35%) and expected return values (1.5, 2, or 2.5% yearly return converted to a daily return assuming 252 trading days per year). Logically, without order fees, option ii is preferable no matter the inter-trade duration (provided the expected return is positive).
+```{r}
+#| label: fig-matrix
+#| fig-cap: "Number of trading days to breakeven depending on the expected daily return and the order fee"
+#| fig-pos: "H"
+#| fig-height: 2
+
+find_breakeven_days <- function(
+    daily_return,
+    order_fee) {
+    log(
+        1 / (1 - order_fee)^2,
+        1 + daily_return
+    )
+}
+
+dt <- data.table(
+    daily_return = rep(c(.015 / 252, .02 / 252, .025 / 252), 2),
+    order_fee = rep(c(0, .0035), 3)
+)[
+    ,
+    breakeven_days := find_breakeven_days(
+        daily_return,
+        order_fee
+    )
+]
+
+ggplot(dt, aes(x = daily_return * 100, y = order_fee * 100, fill = breakeven_days)) +
+    geom_tile() +
+    geom_text(aes(label = round(breakeven_days)), color = "white", size = 3) +
+    scale_y_continuous(
+        breaks = c(0, .35),
+        minor_breaks = NULL
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none") +
+    labs(
+        x = "Expected Daily Return (%)",
+        y = "Order Fee (%)"
+    )
+```
+
+
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+#| label: appendix
+
+print(sessionInfo(), locale = FALSE) |>
+    capture.output() |>
+    strwrap(width = 70, simplify = FALSE) |>
+    unlist() |>
+    cat(sep = "\n")
+```

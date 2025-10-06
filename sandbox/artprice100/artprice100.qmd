@@ -471,7 +471,7 @@ This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was 
 ```{r}
 print(sessionInfo(), locale = FALSE) |>
     capture.output() |>
-    strwrap(width = 50, simplify = FALSE) |>
+    strwrap(width = 70, simplify = FALSE) |>
     unlist() |>
     cat(sep = "\n")
 ```

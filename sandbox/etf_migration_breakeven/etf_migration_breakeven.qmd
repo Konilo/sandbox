@@ -113,18 +113,18 @@ migrating_to_cheap_etf <- function(
     years,
     ter_cheap_etf,
     yearly_return,
-    order_fee,
+    brokerage_fee,
     spread,
     value_0
 ) {
-    value_0 * (1 - order_fee - spread/2)^2 * (1 + yearly_return - ter_cheap_etf)^years
+    value_0 * (1 - brokerage_fee - spread/2)^2 * (1 + yearly_return - ter_cheap_etf)^years
 }
 
 example_migrating_20k <- migrating_to_cheap_etf(
     years = 40,
     ter_cheap_etf = .002,
     yearly_return = .07,
-    order_fee = .0035,
+    brokerage_fee = .0035,
     spread = .003,
     value_0 = 20000
 )
@@ -162,7 +162,7 @@ plot_dt <- plot_dt[
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .07,
-            order_fee = .0035,
+            brokerage_fee = .0035,
             spread = .003,
             value_0 = 5000
         ),
@@ -176,7 +176,7 @@ plot_dt <- plot_dt[
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .07,
-            order_fee = .0035,
+            brokerage_fee = .0035,
             spread = .003,
             value_0 = 20000
         )
@@ -249,7 +249,7 @@ plodt_5t_dt <- dt_5[
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .05,
-            order_fee = .0035,
+            brokerage_fee = .0035,
             value_0 = 5000,
             spread = .003
         ),
@@ -263,7 +263,7 @@ plodt_5t_dt <- dt_5[
             years = years,
             ter_cheap_etf = .002,
             yearly_return = .05,
-            order_fee = .0035,
+            brokerage_fee = .0035,
             value_0 = 20000,
             spread = .003
         )
@@ -317,10 +317,11 @@ find_breakeven_years <- function(
     ter_expensive_etf,
     ter_cheap_etf,
     yearly_return,
-    order_fee,
-    spread) {
+    brokerage_fee,
+    spread
+) {
     log(
-        (1 - order_fee - spread / 2)^2,
+        (1 - brokerage_fee - spread / 2)^2,
         (1 + yearly_return - ter_expensive_etf) /
             (1 + yearly_return - ter_cheap_etf)
     )
@@ -330,7 +331,7 @@ breakeven_years <- find_breakeven_years(
     ter_expensive_etf = .0038,
     ter_cheap_etf = .002,
     yearly_return = .07,
-    order_fee = .0035,
+    brokerage_fee = .0035,
     spread = .003
 )
 ```

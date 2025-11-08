@@ -43,9 +43,9 @@ if (getwd() == "/app") {
 
 Exchange traded funds (ETFs) track the price of a set of underlying assets such as stocks or commodities. Some underlyings -- like the S&P 500 or the MSCI World indexes -- are covered by several different ETFs. In this case, while the underlying is virtually identical from one ETF to the other, the total expense ratios (TERs) of the ETFs vary: some ETFs collect less yearly fees than others -- they are "cheaper" -- effectively provding more returns after accounting for the TER.
 
-If an investor happens to own shares in an ETF while a cheaper ETF exists for the same underlying, it may make sense to sell the former and buy the latter with the resulting cash. Each order (buy or sell) is subjected to a fee by the broker -- the order fee. This fee is a key parameter to determine if one should migrate to the cheap ETF or stay invested in the more expensive one: the saved fund expenses must offset the fees incurred when selling and buying for the migration to make sense. Using the ETFs TER, the order fee, and the expected yearly return of the underlying asset (before fund fees), we can compute the amount of time necessary to make a migration scenario breakeven with a scenario where no migration is carried out.
+If an investor happens to own shares in an ETF while a cheaper ETF exists for the same underlying, it may make sense to sell the former and buy the latter with the resulting cash. Each order (buy or sell) is subjected to a fee by the broker -- the brokerage fee. Moreover, the [bid-ask spread](https://www.investopedia.com/terms/b/bid-askspread.asp) of the ETF on the exchange constitutes an additional, hidden fee collected by the market makers. These fees are a key parameter to determine if one should migrate to the cheap ETF or stay invested in the more expensive one: the saved fund expenses must offset the fees incurred when selling and buying for the migration to make sense. Using the ETFs TER, the brokerage fee, the bid-ask spread, and the expected yearly return of the underlying asset (before fund fees), we can compute the amount of time necessary to make a migration scenario breakeven with a scenario where no migration is carried out.
 
-Herein, we will focus on the ETFs presented in @tbl-etfs. Both track the MSCI Daily Net TR World Euro index. CW8 is an historical, more expensive ETF while DCAM was introduced more recently and has a lower TER. We will consider an order fee of 0.35%.
+Herein, we will focus on the ETFs presented in @tbl-etfs. Both track the MSCI Daily Net TR World Euro index. CW8 is an historical, more expensive ETF while DCAM was introduced more recently and has a lower TER. We will consider an brokerage fee of 0.35% and a bid-ask spread of 0.3% for both ETFs.
 
 | ETF Ticker | ETF Name | TER |
 |---|---|---|
@@ -62,7 +62,8 @@ We will make formulas to compute the resulting capital in each of the two scenar
 - $\text{TER}_\text{expensive ETF}$ = TER of the more expensive ETF
 - $\text{TER}_\text{cheap ETF}$ = TER of the cheaper ETF
 - $\text{yearly return}$ = expected yearly return of the underlying asset (before fund fees)
-- $\text{order fee}$ = order fee applied to buy and sell orders by the broker
+- $\text{brokerage fee}$ = brokerage fee applied to buy and sell orders by the broker
+- $\text{spread}$ = bid-ask spread in %, computed as $(\text{best ask} - \text{best bid}) / \text{best ask}$, considering that sell orders are executed $\text{spread} / 2$% below the spot price and buy orders $\text{spread} / 2$% above it (assuming that the spot price is the $\text{best bid}$ - $\text{best ask}$ mid point).
 - $\text{value}_0$ = initial market value of the shares of the more expensive ETF owned by the investor
 - $\text{value}_\text{years}$ = market value of the investment after $years$ years
 
@@ -103,7 +104,7 @@ With an initial value ($value_0$) of 20 k€ and a yearly return arbitrarily set
 $$
 \text{value}_\text{years} =
 \text{value}_0
-\times (1 - \text{order fee})^2
+\times (1 - \text{brokerage fee} - \text{spread} / 2)^2
 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
 $$ {#eq-cheap}
 
@@ -113,9 +114,10 @@ migrating_to_cheap_etf <- function(
     ter_cheap_etf,
     yearly_return,
     order_fee,
+    spread,
     value_0
 ) {
-    value_0 * (1 - order_fee)^2 * (1 + yearly_return - ter_cheap_etf)^years
+    value_0 * (1 - order_fee - spread/2)^2 * (1 + yearly_return - ter_cheap_etf)^years
 }
 
 example_migrating_20k <- migrating_to_cheap_etf(
@@ -123,6 +125,7 @@ example_migrating_20k <- migrating_to_cheap_etf(
     ter_cheap_etf = .002,
     yearly_return = .07,
     order_fee = .0035,
+    spread = .003,
     value_0 = 20000
 )
 ```
@@ -135,7 +138,7 @@ With the same parameters, migrating from CW8 (TER = 0.38%) to DCAM (TER = 0.20%)
 
 In practice, what we want is to know what minimal investment horizon is needed for the migration to be financially advantageous. We need to compute the outcome of each scenario for varying $years$ values (all other things being equal) and observe the sign of the difference.
 
-Still with an initial value of 20 k€ and a yearly return arbitrarily set at 7%, @fig-graph-resol shows that migrating becomes financially advantageous after a little more than 4 years.
+Still with an initial value of 20 k€ and a yearly return arbitrarily set at 7%, @fig-graph-resol shows that migrating becomes financially advantageous after a little less than 6 years.
 ```{r}
 #| label: fig-graph-resol
 #| fig-cap: "Graphical resolution"
@@ -160,6 +163,7 @@ plot_dt <- plot_dt[
             ter_cheap_etf = .002,
             yearly_return = .07,
             order_fee = .0035,
+            spread = .003,
             value_0 = 5000
         ),
         outcome_staying_20k = staying_in_expensive_etf(
@@ -173,6 +177,7 @@ plot_dt <- plot_dt[
             ter_cheap_etf = .002,
             yearly_return = .07,
             order_fee = .0035,
+            spread = .003,
             value_0 = 20000
         )
     )
@@ -212,7 +217,7 @@ ggplot(plot_dt[years %between% c(1, 10)], aes(x = years, y = delta_20k)) +
 #| tbl-pos: "H"
 
 plot_dt[
-    years %in% c(4, 10, 20, 30, 40),
+    years %in% c(6, 10, 20, 30, 40),
     .(
         "Investment Horizon (years)" = years,
         "Final Capital Difference (Initial Value = 5 000, EUR)" = (outcome_migrating_5k - outcome_staying_5k) |> round(2),
@@ -229,7 +234,7 @@ plot_dt[
 #| tbl-pos: "H"
 
 dt_5 <- data.table(
-    years = c(4, 10, 20, 30, 40)
+    years = c(6, 10, 20, 30, 40)
 )
 plodt_5t_dt <- dt_5[
     ,
@@ -245,7 +250,8 @@ plodt_5t_dt <- dt_5[
             ter_cheap_etf = .002,
             yearly_return = .05,
             order_fee = .0035,
-            value_0 = 5000
+            value_0 = 5000,
+            spread = .003
         ),
         outcome_staying_20k = staying_in_expensive_etf(
             years = years,
@@ -258,7 +264,8 @@ plodt_5t_dt <- dt_5[
             ter_cheap_etf = .002,
             yearly_return = .05,
             order_fee = .0035,
-            value_0 = 20000
+            value_0 = 20000,
+            spread = .003
         )
     )
 ]
@@ -282,27 +289,27 @@ dt_5[
 Graphical resolution works but it is inaccurate and requires more computation than necessary. Equational resolution will provide us with a precise solution. @eq-eq-resol is the resolution without numerical substitution. Note that $value_0$ has no play in the final formula.
 $$
 \begin{multlined}
-\text{value}_0 \times (1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years} = \\ \text{value}_0 \times (1 - \text{order fee})^2 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
+\text{value}_0 \times (1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years} = \\ \text{value}_0 \times (1 - \text{brokerage fee} - \text{spread} / 2)^2 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
 \end{multlined} 
 $$ {#eq-eq-resol}
 
 $$
 \begin{multlined}
-(1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years} = \\ (1 - \text{order fee})^2 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
+(1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years} = \\ (1 - \text{brokerage fee} - \text{spread} / 2)^2 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
 \end{multlined}
 $$
 
 $$
-\frac{(1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years}}{(1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}} = (1 - \text{order fee})^2
+\frac{(1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years}}{(1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}} = (1 - \text{brokerage fee} - \text{spread} / 2)^2
 $$
 
 $$
-\left (\frac{1 + \text{yearly return} - \text{TER}_\text{expensive ETF}}{1 + \text{yearly return} - \text{TER}_\text{cheap ETF}} \right )^\text{years}  = (1 - \text{order fee})^2
+\left (\frac{1 + \text{yearly return} - \text{TER}_\text{expensive ETF}}{1 + \text{yearly return} - \text{TER}_\text{cheap ETF}} \right )^\text{years}  = (1 - \text{brokerage fee} - \text{spread} / 2)^2
 % https://www.mathsisfun.com/algebra/exponents-logarithms.html
 $$
 
 $$
-\text{years} = \log_{\frac{1 + \text{yearly return} - \text{TER}_\text{expensive ETF}}{1 + \text{yearly return} - \text{TER}_\text{cheap ETF}}} (1 - \text{order fee})^2
+\text{years} = \log_{\frac{1 + \text{yearly return} - \text{TER}_\text{expensive ETF}}{1 + \text{yearly return} - \text{TER}_\text{cheap ETF}}} (1 - \text{brokerage fee} - \text{spread} / 2)^2
 $$
 
 ```{r}
@@ -310,10 +317,10 @@ find_breakeven_years <- function(
     ter_expensive_etf,
     ter_cheap_etf,
     yearly_return,
-    order_fee
-) {
+    order_fee,
+    spread) {
     log(
-        (1 - order_fee)^2,
+        (1 - order_fee - spread / 2)^2,
         (1 + yearly_return - ter_expensive_etf) /
             (1 + yearly_return - ter_cheap_etf)
     )
@@ -323,7 +330,8 @@ breakeven_years <- find_breakeven_years(
     ter_expensive_etf = .0038,
     ter_cheap_etf = .002,
     yearly_return = .07,
-    order_fee = .0035
+    order_fee = .0035,
+    spread = .003
 )
 ```
 

@@ -2,7 +2,7 @@
 title: "Holding Cash or Investing in a Money Market Fund Between Trades?"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
-format: 
+format:
   pdf:
     toc: true
     number-sections: true
@@ -25,9 +25,9 @@ library(data.table)
 library(ggplot2)
 library(knitr)
 
-# Runs when executing R interactively (because app/ is the workdir),
+# Runs when executing R interactively (because /workspaces/sandbox/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
-if (getwd() == "/app") {
+if (getwd() == "/workspaces/sandbox") {
     setwd("sandbox/cash_or_mmf_between_trades")
     library(httpgd)
     httpgd::hgd()

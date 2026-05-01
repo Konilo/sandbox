@@ -1,0 +1,45 @@
+// https://containers.dev/implementors/json_reference/
+{
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": ".."
+    },
+    // The Dockerfile is intentionally lean. Features below handle tooling
+    // setup that's independent from the project.
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils": {
+            "configureZshAsDefaultShell": true,
+            "username": "vscode"
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/rocker-org/devcontainer-features/renv-cache:0": {}
+    },
+    "customizations": {
+        "vscode": {
+            "settings": {},
+            "extensions": [
+                "Anthropic.claude-code",
+                "charliermarsh.ruff",
+                "docker.docker",
+                "eamodio.gitlens",
+                "foxundermoon.shell-format",
+                "github.vscode-github-actions",
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter",
+                "quarto.quarto",
+                "rdebugger.r-debugger",
+                "reditorsupport.r",
+                "reditorsupport.r-syntax"
+            ]
+        }
+    },
+    "postCreateCommand": "bash ./.devcontainer/postCreateCommand.sh",
+    // Persist Claude Code sessions/settings and gh CLI auth across rebuilds.
+    "mounts": [
+        "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
+        "source=gh-cli-config-${devcontainerId},target=/home/vscode/.config/gh,type=volume"
+    ],
+    "remoteUser": "vscode"
+}

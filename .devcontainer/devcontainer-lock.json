@@ -1,0 +1,19 @@
+{
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils": {
+      "version": "2.5.7",
+      "resolved": "ghcr.io/devcontainers/features/common-utils@sha256:dbf431d6b42d55cde50fa1df75c7f7c3999a90cde6d73f7a7071174b3c3d0cc4",
+      "integrity": "sha256:dbf431d6b42d55cde50fa1df75c7f7c3999a90cde6d73f7a7071174b3c3d0cc4"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "1.1.0",
+      "resolved": "ghcr.io/devcontainers/features/github-cli@sha256:d22f50b70ed75339b4eed1ba9ecde3a1791f90e88d37936517e3bace0bbad671",
+      "integrity": "sha256:d22f50b70ed75339b4eed1ba9ecde3a1791f90e88d37936517e3bace0bbad671"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/renv-cache:0": {
+      "version": "0.1.2",
+      "resolved": "ghcr.io/rocker-org/devcontainer-features/renv-cache@sha256:705bba0c78d4caf33a57c9a88bbe8e6e10ca944886c5209f2cf84757a6b8cf73",
+      "integrity": "sha256:705bba0c78d4caf33a57c9a88bbe8e6e10ca944886c5209f2cf84757a6b8cf73"
+    }
+  }
+}

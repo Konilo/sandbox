@@ -14,21 +14,12 @@ Studies coded with R, Python, and [Quarto](https://quarto.org/), developed in a 
 
 ## Setup and reproduction of the results
 
-- Install [Docker](https://www.docker.com/) and [VS Code](https://code.visualstudio.com/).
-- Clone the repo.
+- Install [Docker](https://www.docker.com/), [VS Code](https://code.visualstudio.com/), and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
+- Clone the repo and open it in VS Code.
 ```bash
 git clone git@github.com:Konilo/sandbox.git
 cd sandbox
-```
-- Open the cloned repo with VS Code.
-```bash
 code .
 ```
-- Build the Docker image and start the container (use WSL if on Windows).
-```bash
-make start_container
-```
-- In the "Remote Explorer" section of VS Code's side bar, find the `sandbox:v1` container and attach to it.
-- Now, inside the container, open the `/app/` dir where the repo lives.
-- Install the [recommended extensions](https://github.com/Konilo/sandbox/blob/main/.vscode/extensions.json).
-- Open a study and render ("preview") it (Ctrl/Cmd + Shift + K). The reulting document will be saved in the directory of the `qmd` file.
+- Run "Dev Containers: Reopen in Container" from the command palette (Ctrl/Cmd + Shift + P). VS Code builds the image and runs [`.devcontainer/postCreateCommand.sh`](.devcontainer/postCreateCommand.sh), which installs TinyTeX and the project's R + Python dependencies.
+- Once the container is ready, open a study and render ("preview") it (Ctrl/Cmd + Shift + K). The resulting document will be saved in the directory of the `qmd` file.

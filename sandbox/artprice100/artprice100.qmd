@@ -3,7 +3,7 @@ title: "Artprice100©"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
 toc: true
-format: 
+format:
   pdf:
     toc: true
     number-sections: true
@@ -26,7 +26,7 @@ library(lubridate)
 library(readxl)
 library(knitr)
 
-if (getwd() == "/app") {
+if (getwd() == "/workspaces/sandbox") {
     setwd("sandbox/artprice100")
 }
 ```
@@ -427,7 +427,7 @@ pearson_cor_coef <- yearly_returns_dt_wide[
 ] |> round(3)
 ```
 
-The Pearson correlation coefficient between the indexes is `r pearson_cor_coef` indicating a positive yet weak correlation. This further shows that the two indexes are not countercyclical. Nonetheless, the weakness of the relationship means that the blue-chip art market may still be adequate to bring some amount of diversification and hedging to a stocks portfolio. 
+The Pearson correlation coefficient between the indexes is `r pearson_cor_coef` indicating a positive yet weak correlation. This further shows that the two indexes are not countercyclical. Nonetheless, the weakness of the relationship means that the blue-chip art market may still be adequate to bring some amount of diversification and hedging to a stocks portfolio.
 
 
 # Conclusions

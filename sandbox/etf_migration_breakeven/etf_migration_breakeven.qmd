@@ -2,14 +2,14 @@
 title: "When to Migrate Away From an Expensive ETF to a Cheaper, Equivalent One?"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
-format: 
+format:
   pdf:
     toc: true
     number-sections: true
     colorlinks: true
     papersize: a4
     # https://github.com/quarto-dev/quarto-cli/discussions/5550
-    include-in-header: 
+    include-in-header:
       - text: \usepackage{mathtools}
 execute:
     echo: false
@@ -30,7 +30,7 @@ library(knitr)
 
 # Runs when executing R interactively (because app/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
-if (getwd() == "/app") {
+if (getwd() == "/workspaces/sandbox") {
     setwd("sandbox/etf_migration_breakeven")
     library(httpgd)
     httpgd::hgd()
@@ -290,7 +290,7 @@ Graphical resolution works but it is inaccurate and requires more computation th
 $$
 \begin{multlined}
 \text{value}_0 \times (1 + \text{yearly return} - \text{TER}_\text{expensive ETF})^\text{years} = \\ \text{value}_0 \times (1 - \text{brokerage fee} - \text{spread} / 2)^2 \times (1 + \text{yearly return} - \text{TER}_\text{cheap ETF})^\text{years}
-\end{multlined} 
+\end{multlined}
 $$ {#eq-eq-resol}
 
 $$

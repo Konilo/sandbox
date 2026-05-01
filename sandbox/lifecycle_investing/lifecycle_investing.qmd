@@ -3,7 +3,7 @@ title: "Lifecycle Investing"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
 toc: true
-format: 
+format:
   pdf:
     toc: true
     number-sections: true
@@ -28,7 +28,7 @@ library(scales)
 
 # Runs when executing R interactively (because app/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
-if (getwd() == "/app") {
+if (getwd() == "/workspaces/sandbox") {
     setwd("sandbox/leveraged_etfs")
     library(httpgd)
     httpgd::hgd()
@@ -59,7 +59,7 @@ $$ {#eq-tp}
 - Based on one's level of risk aversion, a certain share of their investment portfolio should be allocated to risky assets (stocks, typically) and the rest to relatively less risky assets (bonds, typically) -- this is the Merton-Samuelson share.
 - One simplistic way to apply this share is to apply it to the savings portfolio i.e., the capital one currently possesses in the bank (or in the form of real estate, etc.).
 - The issue with this method is that it ignores the capital that has not yet materialized but is likely to in the future: that is savings from future salaries, typically. On one hand, it might feel risky to bet on these future savings -- who knows what the future holds -- but, on the other hand, it is generally overly conservative to assume that no future savings will ever be made. So, it makes sense to make a cautious but considerable assumption for planning sakes.
-- Since we are relatively confident that those future savings will actually be made, they can be added to the savings portfolio like if they were bonds (low return and low risk). 
+- Since we are relatively confident that those future savings will actually be made, they can be added to the savings portfolio like if they were bonds (low return and low risk).
 
 Now, how to compute their *current* value? Considering those savings like bonds implies that their value grows up until they reach maturity and migrate as savings in the savings portfolio. That means that their current value depends on the yield of bonds and on the time between now and the materialization of the saving. If we consider that 10 k€ will be saved from one's salary 10 years from now and using a yearly yield of 1%, then the current value of those savings is $10000 / (1 + 0.01)^{10}=9052.87$. This is like rewinding 10 years of yield. The yield manipulated this way is also called a *discount rate*: we apply it in reverse to discount the final value and obtain the current value. @eq-cvfs-i provides the formula with $CVFS_i$ being the current value of the future saving *i*, $FS_i$ being the future saving *i* in question, $DR$ being the discount rate, and $NY$ corresponding to the number of years between now and the materialization of saving *i*.
 

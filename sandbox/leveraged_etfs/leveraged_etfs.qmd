@@ -3,7 +3,7 @@ title: "Leveraged ETFs -- The Case Of CL2"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
 toc: true
-format: 
+format:
   pdf:
     toc: true
     number-sections: true
@@ -33,7 +33,7 @@ library(knitr)
 
 # Runs when executing R interactively (because app/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
-if (getwd() == "/app") {
+if (getwd() == "/workspaces/sandbox") {
     setwd("sandbox/leveraged_etfs")
     library(httpgd)
     httpgd::hgd()
@@ -588,7 +588,7 @@ From 2020-01-01 to 2025-07-27, @tbl-1 summarizes the risk-adjusted returns of th
 ```{r}
 #| label: tbl-1
 #| tbl-cap: "Risk-adjusted returns of the MSCI USA index (net, EUR) & of the CL2"
-#| tbl-pos: "H" 
+#| tbl-pos: "H"
 
 risk_adj_tbl <- dt[
     !is.na(msci_usa) & !is.na(cl2) & !is.na(usd_eur) & date %between% c("2020-01-01", "2025-07-27"),
@@ -607,7 +607,7 @@ risk_adj_tbl <- dt[
     )
 ]
 
-risk_adj_tbl |> 
+risk_adj_tbl |>
     round(2) |>
     kable(
         col.names = c("Year", "MSCI USA Annualized Return (%)", "CL2 Annualized Return (%)", "MSCI USA Annualized Volatility (% points)", "CL2 Annualized Volatility (% points)", "MSCI USA Sharpe Ratio", "CL2 Sharpe Ratio")
@@ -641,13 +641,13 @@ ggplot(ester, aes(x = date, y = ester)) +
 Based on the work of Avellaneda and Zhang ([2010](https://doi.org/10.1137/090760805)), and of a Reddit contributor ([2024](https://www.reddit.com/r/vosfinances/comments/1czhb3o/partie_1_etf_%C3%A0_effet_de_levier_analyse_et/)) who focused specifically on CL2, we use the following expression for the expected annual return of a long LETF (Equation \ref{eq-main}):
 
 \begin{align}
-\mathbb{E}[R_L] &\approx L \cdot \mu 
+\mathbb{E}[R_L] &\approx L \cdot \mu
 && \text{(expected return)} \\
-&\quad - \frac{1}{2} L (L - 1) \cdot \sigma^2 
+&\quad - \frac{1}{2} L (L - 1) \cdot \sigma^2
 && \text{(beta slippage)} \\
-&\quad - (L - 1) \cdot r 
+&\quad - (L - 1) \cdot r
 && \text{(cost of borrowing)} \\
-&\quad - f 
+&\quad - f
 && \text{(fund expense ratio)}
 \label{eq-main}
 \end{align}
@@ -688,7 +688,7 @@ Before we use this formula to make forward predictions, let's assess how well it
 ```{r}
 #| label: tbl-acc
 #| tbl-cap: "Accuracy of the CL2 annual return predictions over the years"
-#| tbl-pos: "H" 
+#| tbl-pos: "H"
 
 assessment_dt <- copy(dt)[
     !is.na(cl2) & !is.na(msci_usa) & !is.na(usd_eur) & date %between% c("2020-01-01", "2025-07-27"),
@@ -717,7 +717,7 @@ annual_assessment <- assessment_dt[
 
         # Annual volatility of underlying
         underlying_volatility = sd(msci_usa_eur_return, na.rm = TRUE) * sqrt(252) * 100,
-        
+
         # Average annual borrowing rate
         avg_borrowing_rate = mean(ester_decimal, na.rm = TRUE) * 100
     ),
@@ -817,7 +817,7 @@ plot_exp_returns_fixed_underlying_return <- function(
             )
         }, volatility, interest_rate)
     ]
-    
+
     ggplot(plot_data, aes(x = interest_rate * 100, y = volatility * 100, fill = expected_return)) +
         geom_tile() +
         geom_text(aes(label = round(expected_return * 100, 1)), color = "black", size = 3) +
@@ -875,13 +875,13 @@ plot_exp_returns_fixed_interest_rate <- function(
         ,
         return_delta := expected_return - underlying_return
     ]
-    
+
     ggplot(plot_data, aes(x = underlying_return * 100, y = volatility * 100, fill = return_delta)) +
         geom_tile() +
         geom_text(aes(label = round(expected_return * 100, 1)), color = "black", size = 3) +
         scale_fill_gradient2(
             low = "#a60000ff",
-            mid = "white", 
+            mid = "white",
             high = "#0ea600ff",
             midpoint = 0
         ) +
@@ -931,7 +931,7 @@ plot_exp_returns_fixed_underlying_return(underlying_return = 0.1)
 ```{r}
 #| label: fig-fwd-7
 #| fig-cap: "Expected annual return of a 2x LETF on an underlying asset with a 7% expected return"
-#| fig-pos: "H" 
+#| fig-pos: "H"
 #| fig-height: 3
 
 plot_exp_returns_fixed_underlying_return(underlying_return = 0.07)

@@ -38,7 +38,7 @@ if (getwd() == "/workspaces/sandbox") {
 
 # Introduction
 
-When contributing to an investment portfolio that follows a strategy involving more than one asset -- each with its own target allocation -- while ruling out selling, computing the amount to contribute to each asset can be tricky. This study explains that challenge and provides its solution.
+When contributing to an investment portfolio that follows a strategy involving more than one asset -- each with its own target allocation -- while ruling out selling, computing the amount to contribute to each asset can be tricky. The study that follows explains that challenge and provides its solution. This solution is provided as a CLI tool available at [github.com/Konilo/dcallocate](https://github.com/Konilo/dcallocate).
 
 
 # No selling required to stay balanced -- the simplest case {#sec-no-selling-needed}

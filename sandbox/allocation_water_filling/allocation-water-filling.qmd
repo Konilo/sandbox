@@ -1,0 +1,163 @@
+---
+title: "allocation_water_filling"
+author: "Konilo Zio"
+date: "`r Sys.time()`"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    papersize: a4
+execute:
+    echo: false
+---
+
+```{r}
+#| label: setup
+#| echo: false
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(ggplot2)
+library(knitr)
+
+# Runs when executing R interactively (because /workspaces/sandbox/ is the workdir),
+# but not when rendering the qmd (because the qmd's dir is the workdir in that case)
+if (getwd() == "/workspaces/sandbox") {
+    setwd("sandbox/allocation_water_filling")
+    library(httpgd)
+    httpgd::hgd()
+    # Plots will be displayed via a web page whose URL will be printed be the function above
+}
+```
+
+
+# Introduction
+
+When (i) investing regularly (e.g., monthly) (ii) following a strategy that involves more than one asset -- each with its own target allocation -- while (iii) ruling out asset selling, computing the amount to invest in each asset at a point in time can be tricky.
+
+
+# Simplest case
+
+Let's say we just received our pay and now have 1 000 € to invest.
+
+Let's say that, at that point, the portfolio is like so:
+
+| Asset | Target allocation (%) | Actual allocation (%) | Target value (€) | Actual value (€) |
+|---|---|---|---|---|
+| Index ETF |  90 % |  95 % |  9 000 € |  9 500 € |
+| Managed futures ETF |  10 % |   5 % |  1 000 € |   500 € |
+| Total portfolio | 100 % | 100 % | 10 000 € | 10 000 |
+: Pre-investment situation {#tbl-1-pre}
+
+Adding 1 000 € to the portfolio would lead to the following value targets
+
+| Asset | Target allocation | Target value | Pre-investment value | Delta |
+|---|---|---|---|---|
+| Index ETF | 90 % | 9 900 € | 9 500€ | + 400 € |
+| Managed futures ETF | 10 % | 1 100 € | 1 000 € | + 600 € |
+| Total portfolio | 100 % | 11 000 € | 10 000 € | + 1000 € |
+: Post-investment targets {#tbl-1-post}
+
+In that case, 400 € of the 1000 € investment are allocated to the index ETF and 600 € to the managed futures ETF to reach the targets. The math is simple, no selling is required.
+
+
+# When selling is allowed
+
+Now, let's say that just before investing, the portfolio is like so:
+
+| Asset | Target allocation | Actual allocation | Target value | Actual value |
+|---|---|---|---|---|
+| Index ETF | 90 % | 95 % | 27 000 € | 28 500 € |
+| Managed futures ETF | 10 % | 5 % | 3 000 € |  1 500 € |
+| Total portfolio | 100 % | 100 % | 30 000 € | 30 000 |
+: Pre-investment situation {#tbl-2-pre}
+
+Adding 1 000 € to the portfolio would lead to the following value targets
+
+| Asset | Target allocation | Target value | Pre-investment value | Delta |
+|---|---|---|---|---|
+| Index ETF | 90 % | 27 900 € | 28 500 € | -   600 € |
+| Managed futures ETF | 10 % |  3 100 € |  1 500 € | + 1 600 € |
+| Total portfolio | 100 % | 31 000 € | 30 000€ | + 1 000 € |
+: Post-investment targets {#tbl-2-post}
+
+In that case you can see that, to reach the targets, we would need to
+- sell 600 € worth of index ETF shares
+- and buy 1 600 € of managed futures ETF shares (i.e., the 1 000 € investment + 600 € of cash from selling the index ETF shares).
+
+That's still simple, mathemically. But, from a practical standpoint, selling is generally avoided if possible in order to minimize order fees which can substantially damage the portfolio's return if repeated (x% of the order's amount is paid by the investor).
+
+
+# When selling is prohibited -- simplest case
+
+We'll consider the same pre-investment situation as above. But, this time, the investor chooses to prohibit selling -- in order to avoid selling order fees -- because they think they contribute enough every month to keep their portfolio approximately balanced.
+
+In that case, they could simply invest all their contribution in the underweight asset and be done. @tbl-3-post shows that approach would reduce the managed futures ETF's delta while leaving the index ETF's delta intact.
+
+| Asset | Target allocation | Target value | Actual value | Delta |
+|---|---|---|---|---|
+| Index ETF | 90 % | 27 900 € | 28 500 € | -   600 € |
+| Managed futures ETF | 10 % | 3 100 € |  2 500 € | +   600 € |
+| Total portfolio | 100 % | 31 000 € | 31 000 € | +     0 € |
+: Post-investment situation {#tbl-3-post}
+
+TODO measure pre-invest imbalance.
+
+
+# When selling is prohibited -- when it gets tricky
+
+Now, what if we have 5 000 € to invest? Using the naive apporach from above would yield the situation in @tbl-4-post: the portfolio goes from managed futures ETF-underweight to index ETF-underweight and, most importantly for our strategy, it gets more unbalanced as the imbalance goes from __ to 3 000 €
+
+| Asset | Target allocation | Target value | Actual value | Delta |
+|---|---|---|---|---|
+| Index ETF | 90 % | 31 500 € | 28 500 € | + 3 000 € |
+| Managed futures ETF | 10 % |  3 500 € |  6 500 € | - 3 000 € |
+| Total portfolio | 100 % | 35 000 € | 35 000 € | +     0 € |
+: Post-investment situation {#tbl-4-post}
+
+In that case, we need another, two step, mathematical approach to compute how to allocate the 1 000 €.
+
+
+# When selling is prohibited and there are 2+ underweight assets -- when it gets actually laborious
+
+
+# Draft
+
+The breakeven between the two scenarios involves the following variables:
+
+- $\text{days}$ = inter-trade duration in trading days
+- $\text{daily return}$ = expected net daily return of the risk-off asset
+- $\text{order fee}$ = order fee applied to buy and sell orders by the broker
+- $\text{cash}$ = initial amount of liquidities (cash) to manage with either option
+
+@eq-break models the problem and finds the formula to compute the number of \text{days} necessary to breakeven.
+$$
+\text{cash} = \text{cash} (1 - \text{order fee}) (1 + \text{daily return})^\text{days} (1 - \text{order fee})
+$$ {#eq-break}
+
+
+
+blabla
+```{r}
+print("yes")
+```
+
+
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+#| label: appendix
+
+print(sessionInfo(), locale = FALSE) |>
+    capture.output() |>
+    strwrap(width = 70, simplify = FALSE) |>
+    unlist() |>
+    cat(sep = "\n")
+```

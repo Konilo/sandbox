@@ -1,0 +1,340 @@
+---
+title: "Portfolio Contribution Complexities"
+author: "Konilo Zio"
+date: "`r Sys.time()`"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+    papersize: a4
+execute:
+    echo: false
+---
+
+```{r}
+#| label: setup
+#| echo: false
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(ggplot2)
+library(knitr)
+
+# Runs when executing R interactively (because /workspaces/sandbox/ is the workdir),
+# but not when rendering the qmd (because the qmd's dir is the workdir in that case)
+if (getwd() == "/workspaces/sandbox") {
+    setwd("sandbox/allocation_water_filling")
+    library(httpgd)
+    httpgd::hgd()
+    # Plots will be displayed via a web page whose URL will be printed be the function above
+}
+```
+
+
+# Introduction
+
+When contributing to an investment portfolio that follows a strategy involving more than one asset -- each with its own target allocation -- while ruling out selling, computing the amount to contribute to each asset can be tricky. This study explains that challenge and provides its solution.
+
+
+# No selling required to stay balanced -- the simplest case {#sec-no-selling-needed}
+
+Let's say we have 1 000 € to contribute and our portfolio is like so:
+
+| Asset | Target allocation | Actual allocation | Target value | Actual value |
+|---|---|---|---|---|
+| Index ETF | 90 % | 95 % | 9 000 € | 9 500 € |
+| Managed-futures ETF | 10 % | 5 % | 1 000 € | 500 € |
+| Total portfolio | 100 % | 100 % | 10 000 € | 10 000 € |
+: Pre-investment situation {#tbl-1-pre}
+
+Adding 1 000 € to the portfolio would lead to the following value targets
+
+| Asset | Target allocation | Target value | Pre-investment value | Delta |
+|---|---|---|---|---|
+| Index ETF | 90 % | 9 900 € | 9 500 € | + 400 € |
+| Managed-futures ETF | 10 % | 1 100 € | 1 000 € | + 600 € |
+| Total portfolio | 100 % | 11 000 € | 10 000 € | + 1 000 € |
+: Post-investment targets {#tbl-1-post}
+
+In that case, 400 € of the 1000 € investment are allocated to the index ETF and 600 € to the managed-futures ETF to reach the targets. The math is simple, no selling is required to stay balanced.
+
+
+# Selling is required to stay balanced and is allowed {#sec-selling-allowed}
+
+Now, let's say that just before contributing, the portfolio is like so:
+
+| Asset | Target allocation | Actual allocation | Target value | Actual value |
+|---|---|---|---|---|
+| Index ETF | 90 % | 95 % | 27 000 € | 28 500 € |
+| Managed-futures ETF | 10 % | 5 % | 3 000 € | 1 500 € |
+| Total portfolio | 100 % | 100 % | 30 000 € | 30 000 € |
+: Pre-investment situation {#tbl-2-pre}
+
+Contributing 1 000 € to the portfolio would lead to the following value targets
+
+| Asset | Target allocation | Target value | Pre-investment value | Delta |
+|---|---|---|---|---|
+| Index ETF | 90 % | 27 900 € | 28 500 € | - 600 € |
+| Managed-futures ETF | 10 % | 3 100 € | 1 500 € | + 1 600 € |
+| Total portfolio | 100 % | 31 000 € | 30 000 € | + 1 000 € |
+: Post-investment targets {#tbl-2-post}
+
+In that case we can see that, to reach the targets, we would need to:
+
+- sell 600 € worth of index ETF shares
+- and buy 1 600 € of managed-futures ETF shares (i.e., the 1 000 € investment + 600 € of cash from selling the index ETF shares).
+
+That's still simple, mathematically.
+
+
+## Implementation in R
+
+When selling is allowed, each $\Delta_i$ is just the asset's post-contribution target value minus its pre-contribution value (which can be negative when selling is required):
+
+```{r}
+#| label: allocate-with-selling
+#| echo: true
+
+allocate_with_selling <- function(v_pre, tw, C) {
+    stopifnot(
+        length(v_pre) == length(tw),
+        all(tw > 0),
+        abs(sum(tw) - 1) < 1e-9,
+        C >= 0
+    )
+    tw * (sum(v_pre) + C) - v_pre
+}
+```
+
+
+### Demo case
+
+Reusing the portfolio from the pre-investment situation above:
+
+```{r}
+#| label: example-with-selling
+#| echo: true
+
+allocate_with_selling(v_pre = c(28500, 1500), tw = c(0.9, 0.1), C = 1000)
+# expected: -600, 1600
+```
+
+
+# The math problem that comes from prohibiting selling
+
+From a practical standpoint, selling is generally avoided, if possible, in order to minimize order fees which can substantially damage the portfolio's return if repeated ($x$% of the order's amount is paid by the investor).
+
+The resulting math problem is as follows.
+
+The input parameters:
+
+- $n$ = number of assets, indexed by $i$ = 1, 2, ..., n.
+- $\text{tw}_i$ = target weight of asset $i$ (e.g., 0.85). The sum of the targets is 1.
+- $v_i^{\text{pre}}$ = pre-contribution value of asset $i$, in €.
+- $V^{\text{pre}} = \sum_{i=1}^{n} v_i^{\text{pre}}$ = pre-contribution total portfolio value.
+- $C$ = contribution to invest, in €.
+
+The variables we are solving for:
+
+- $\Delta_i$ = how much of $C$ should be allocated to asset $i$, in €.
+- With two constraints:
+    - $\Delta_i \geq 0$ for all $i$ i.e., no selling is allowed,
+    - $\sum_{i=1}^{n} \Delta_i = C$: the whole contribution amount is invested.
+
+Three variables can be derived from the known input parameters:
+
+- $V^{\text{post}} = V^{\text{pre}} + C$: post-contribution total.
+- $\text{tv}_i^{\text{post}} = \text{tw}_i \times V^{\text{post}}$: target post-contribution value of asset $i$, in €.
+- $d_i = \text{tv}_i^{\text{post}} − v_i^{\text{pre}}$: the deficit of asset $i$, measuring how far below its post-contribution target it currently sits. Positive means asset $i$ is underweight; negative means it is already overweight.
+
+And one identity: the sum of the deficits equals the contribution.
+
+$$
+\sum_{i=1}^{n} d_i
+  = \sum_{i=1}^{n} (\text{tv}_i^{\text{post}} − v_i^{\text{pre}})
+  = \sum_{i=1}^{n} \text{tv}_i^{\text{post}} − \sum_{i=1}^{n} v_i^{\text{pre}}
+  = V^{\text{post}} − V^{\text{pre}}
+  = C
+$$ {#eq-def-c}
+
+
+# When selling is prohibited and all deficits $\geq 0$
+
+When selling is prohibited but all deficits are positive -- i.e., all assets are underweight -- the resolution is simple:
+
+- $\Delta_i = d_i$ for every asset.
+- By definition, both constraints are respected:
+    - each $\Delta_i$ $\geq 0$
+    - and $\Delta_i$ sum to $C$ as per @eq-def-c.
+- By setting $\Delta_i$ to $d_i$, every asset's value reaches its target: the portfolio is perfectly balanced.
+
+
+# When selling is prohibited and some deficits $< 0$ {#sec-deficits-negative}
+
+When some deficits are negative, a more complex method is necessary to compute the $\Delta_i$ values.
+
+From an investor standpoint, that happens when between contributions, the assets in the portfolio change in value at different rates: for example, the index ETF rallies while the managed-futures ETF moves sideways. The faster-growing assets become overweight relative to their target weights, and the slower ones become underweight. If the drift is small, the new contribution $C$ is enough to (i) top up the underweight assets back to their targets and (ii) dilute the overweight ones back to their targets as well. But once an asset has drifted far enough that even diluting the portfolio with $C$ doesn't bring it back to target, perfect rebalancing would require selling some of that asset -- which we prohibit.
+
+From a mathematical standpoint, this shows up as $v_i^{\text{pre}} > \text{tv}_i^{\text{post}}$ for at least one asset, which means that we have at least one negative deficit ($d_i < 0$). When that happens, a more complex method is required to compute the $\Delta_i$.
+
+
+## The method
+
+1. Set $\Delta_i = 0$ for every overweight asset: no contribution for them. Those assets are "stuck", and the remaining ones are "non-stuck".
+2. Compute the post-contribution total value that the non-stuck assets must collectively reach ($V^\text{post}_N$).
+    - Define index sets: $S$ = set of indices of stuck assets, $N$ = set of indices of non-stuck assets.
+    - Make the computation:
+    $$
+    V^\text{post}_N = V^\text{post} - \sum_{i \in S} v_i^{\text{pre}}
+    $$
+3. Compute the renormalized target weights for the non-stuck assets ($\text{tw}^*_i$).
+    - For each $i \in N$, divide its original target weight by the sum of the non-stuck assets' original target weights:
+    $$
+    \text{tw}^*_i = \frac{\text{tw}_i}{\sum_{j \in N} \text{tw}_j}
+    $$
+    - By construction, $\sum_{i \in N} \text{tw}^*_i = 1$.
+4. Compute the new target values and deficits for the non-stuck assets ($\text{tv}^{\text{post},*}_i$ and $d^*_i$).
+    - For each $i \in N$:
+    $$
+    \text{tv}^{\text{post},*}_i = \text{tw}^*_i \times V^\text{post}_N, \qquad d^*_i = \text{tv}^{\text{post},*}_i - v_i^{\text{pre}}
+    $$
+5. If any $d^*_i < 0$: add those indices to $S$ (i.e., mark them stuck), set their $\Delta_i$ to 0, and return to step 2.
+6. Otherwise (all surviving $d^*_i \geq 0$): set $\Delta_i = d^*_i$ for every $i \in N$. Stuck assets keep $\Delta_i = 0$. Problem solved.
+
+
+## Why this method is correct
+
+Two facts justify the algorithm without the need for a measure of imbalance (a cost function whose result we should minimize).
+
+* *Stuck assets must get $\Delta_i = 0$.* For any asset $i$ with $d_i < 0$ (i.e., $v_i^\text{pre} > \text{tv}_i^\text{post}$), allocating any cash $\Delta_i > 0$ only grows the overshoot while depriving an underweight asset of cash that would reduce its shortfall. This strictly worsens any reasonable measure of imbalance (sum of absolute deviations, sum of squared deviations, max deviation, etc.). So the choice $\Delta_i = 0$ for stuck assets is forced regardless of how we measure imbalance.
+
+* *Surviving deficits still sum to $C$ at every recursion step.* The identity in @eq-def-c also holds after dropping the stuck set $S$ and renormalizing target weights across $N$:
+
+$$
+\sum_{i \in N} d^*_i
+  = \sum_{i \in N} \text{tw}^*_i \times V^\text{post}_N - \sum_{i \in N} v_i^\text{pre}
+  = V^\text{post}_N - \sum_{i \in N} v_i^\text{pre}
+  = V^\text{post} - V^\text{pre}
+  = C
+$$
+
+(where the second equality uses $\sum_{i \in N} \text{tw}^*_i = 1$, and the third uses $V^\text{post}_N = V^\text{post} - \sum_{i \in S} v_i^\text{pre}$.) So when the recursion terminates with all surviving $d^*_i \geq 0$, setting $\Delta_i = d^*_i$ for $i \in N$ uses exactly the $C$ € available and lands every survivor on its renormalized target value $\text{tv}^{\text{post},*}_i$.
+
+
+## Implementation in R
+
+The function below implements the algorithm from the previous section. The variable names map directly to the math notation:
+
+- `v_pre` is $v_i^\text{pre}$,
+- `tw` is $\text{tw}_i$,
+- `C` is $C$,
+- `V_post` is $V^\text{post}$,
+- `V_post_N` is $V^\text{post}_N$,
+- `tw_star` is $\text{tw}^*_i$,
+- `d_star` is $d^*_i$,
+- and `delta` is $\Delta_i$.
+
+```{r}
+#| label: allocate
+#| echo: true
+
+allocate_no_selling <- function(v_pre, tw, C, verbose = FALSE) {
+    stopifnot(
+        length(v_pre) == length(tw),
+        all(tw > 0),
+        abs(sum(tw) - 1) < 1e-9,
+        C >= 0
+    )
+
+    n <- length(v_pre)
+    V_post <- sum(v_pre) + C
+    stuck <- rep(FALSE, n)
+    delta <- rep(0, n)
+
+    iter <- 0
+    repeat {
+        iter <- iter + 1
+        N <- which(!stuck)
+        V_post_N <- V_post - sum(v_pre[stuck])
+        tw_star <- tw[N] / sum(tw[N])
+        d_star <- tw_star * V_post_N - v_pre[N]
+
+        if (verbose) {
+            S_str <- if (any(stuck)) toString(which(stuck)) else "(none)"
+            cat(sprintf("\n--- Iteration %d ---\n", iter))
+            cat(sprintf("  S (stuck):     %s\n", S_str))
+            cat(sprintf("  N (non-stuck): %s\n", toString(N)))
+            cat(sprintf("  V^post_N:      %g\n", V_post_N))
+            cat(sprintf("  tw*:           %s\n", toString(round(tw_star, 4))))
+            cat(sprintf("  d*:            %s\n", toString(round(d_star, 4))))
+        }
+
+        newly_stuck <- d_star < 0
+        if (!any(newly_stuck)) {
+            delta[N] <- d_star
+            if (verbose) cat("  -> all d* >= 0; allocating d* to N. Done.\n")
+            break
+        }
+        if (verbose) {
+            cat(sprintf("  -> newly stuck: %s\n", toString(N[newly_stuck])))
+        }
+        stuck[N[newly_stuck]] <- TRUE
+    }
+
+    delta
+}
+```
+
+
+### Demo cases
+
+Three demo cases, mirroring the situations described above.
+
+1. **No recursion needed:** reusing the portfolio from @sec-no-selling-needed:
+
+```{r}
+#| label: example-a
+#| echo: true
+
+allocate_no_selling(v_pre = c(9500, 500), tw = c(0.9, 0.1), C = 1000)
+# expected: 400, 600
+```
+
+2. **Single recursion step:** the portfolio from @sec-selling-allowed, but applying the no-selling rule from @sec-deficits-negative -- the index ETF gets stuck and all cash goes to the managed-futures ETF:
+
+```{r}
+#| label: example-b1
+#| echo: true
+
+allocate_no_selling(v_pre = c(28500, 1500), tw = c(0.9, 0.1), C = 1000)
+# expected: 0, 1000
+```
+
+3. **Two recursion steps:** a 3-asset portfolio where one asset is initially overweight, and dropping it reveals a second overweight asset via renormalization (running with `verbose = TRUE` to trace the iterations):
+
+```{r}
+#| label: example-b2
+#| echo: true
+
+allocate_no_selling(v_pre = c(60, 45, 1), tw = c(0.5, 0.4, 0.1), C = 10, verbose = TRUE)
+# expected: 0, 0, 10
+```
+
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+#| label: appendix
+
+print(sessionInfo(), locale = FALSE) |>
+    capture.output() |>
+    strwrap(width = 70, simplify = FALSE) |>
+    unlist() |>
+    cat(sep = "\n")
+```

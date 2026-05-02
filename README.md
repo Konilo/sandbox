@@ -10,6 +10,7 @@ Studies coded with R, Python, and [Quarto](https://quarto.org/), developed in a 
 - [Leveraged ETFs &ndash; The Case Of CL2](https://github.com/Konilo/sandbox/tree/main/sandbox/leveraged_etfs/leveraged_etfs.pdf): a study of daily-rebalanced leveraged ETFs and an outlook on CL2's relevance for long-term investors.
 - [When to Migrate Away From an Expensive ETF to a Cheaper, Equivalent One?](https://github.com/Konilo/sandbox/tree/main/sandbox/etf_migration_breakeven/etf_migration_breakeven.pdf): determining when migrating from an ETF to another, equivalent ETF with a lower total expense ratio is financially advantageous.
 - [Holding Cash or Investing in a Money Market Fund Between Trades?](https://github.com/Konilo/sandbox/tree/main/sandbox/cash_or_mmf_between_trades/cash_or_mmf_between_trades.pdf): determining when investing liquidities in a money market fund is more advantageous than holding them as cash during inter-trade periods.
+- [Portfolio Contribution Complexities](https://github.com/Konilo/sandbox/tree/main/sandbox/portfolio_contribution_complexities/portfolio_contribution_complexities.pdf): how to split a contribution to a portfolio that contains multiple assets with target weights when selling is ruled out.
 
 
 ## Setup and reproduction of the results

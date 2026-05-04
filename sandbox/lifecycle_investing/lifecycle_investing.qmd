@@ -2,13 +2,6 @@
 title: "Lifecycle Investing"
 author: "Konilo Zio"
 date: "`r Sys.time()`"
-toc: true
-format:
-  pdf:
-    toc: true
-    number-sections: true
-    colorlinks: true
-    papersize: a4
 execute:
     echo: false
 ---

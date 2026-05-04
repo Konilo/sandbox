@@ -1,0 +1,43 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - "sandbox/*/*.qmd"
+    - "!draft/**"
+    - "!_extensions/**"
+    - "!renv/**"
+
+website:
+  title: "sandbox"
+  description: "Studies coded with R, Python, and Quarto."
+  repo-url: https://github.com/Konilo/sandbox
+  repo-actions: [source, issue]
+  navbar:
+    right:
+      - icon: github
+        href: https://github.com/Konilo/sandbox
+        aria-label: GitHub
+  sidebar:
+    style: docked
+    search: true
+    contents:
+      - href: index.qmd
+        text: Home
+      - section: Studies
+        contents:
+          - sandbox/lifecycle_investing/lifecycle_investing.qmd
+          - sandbox/artprice100/artprice100.qmd
+          - sandbox/leveraged_etfs/leveraged_etfs.qmd
+          - sandbox/etf_migration_breakeven/etf_migration_breakeven.qmd
+          - sandbox/cash_or_mmf_between_trades/cash_or_mmf_between_trades.qmd
+          - sandbox/portfolio_contribution_complexities/portfolio_contribution_complexities.qmd
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: left
+    number-sections: true
+    code-fold: true
+    code-tools: true

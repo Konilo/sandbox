@@ -1,0 +1,16 @@
+---
+title: "sandbox"
+toc: false
+number-sections: false
+---
+
+Studies coded with R, Python, and [Quarto](https://quarto.org/), developed in a well-controlled environment (Docker, `renv`, `uv`) for reproducibility purposes.
+
+## Studies
+
+- [Lifecycle Investing](sandbox/lifecycle_investing/lifecycle_investing.qmd): an exploration of a few striking aspects of this approach in the context of retirement planning.
+- [Artprice100](sandbox/artprice100/artprice100.qmd): a basic financial analysis of the Artprice100 index.
+- [Leveraged ETFs &ndash; The Case Of CL2](sandbox/leveraged_etfs/leveraged_etfs.qmd): a study of daily-rebalanced leveraged ETFs and an outlook on CL2's relevance for long-term investors.
+- [When to Migrate Away From an Expensive ETF to a Cheaper, Equivalent One?](sandbox/etf_migration_breakeven/etf_migration_breakeven.qmd): determining when migrating from an ETF to another, equivalent ETF with a lower total expense ratio is financially advantageous.
+- [Holding Cash or Investing in a Money Market Fund Between Trades?](sandbox/cash_or_mmf_between_trades/cash_or_mmf_between_trades.qmd): determining when investing liquidities in a money market fund is more advantageous than holding them as cash during inter-trade periods.
+- [Portfolio Contribution Complexities](sandbox/portfolio_contribution_complexities/portfolio_contribution_complexities.qmd): how to split a contribution to a portfolio that contains multiple assets with target weights when selling is ruled out.

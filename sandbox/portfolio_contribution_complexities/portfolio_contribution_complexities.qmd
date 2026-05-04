@@ -94,7 +94,7 @@ That's still simple, mathematically.
 
 ## Implementation in R
 
-When selling is allowed, each $\Delta_i$ is just the asset's post-contribution target value minus its pre-contribution value (which can be negative when selling is required):
+When selling is allowed, computing each asset's adjustment (i.e., "buy x €" or "sell y €") is straightforward: subtract its pre-contribution value from its post-contribution target value. A negative result means selling is required.
 
 ```{r}
 #| label: allocate-with-selling

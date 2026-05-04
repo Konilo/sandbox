@@ -1,13 +1,7 @@
 ---
 title: "Holding Cash or Investing in a Money Market Fund Between Trades?"
 author: "Konilo Zio"
-date: "`r Sys.time()`"
-format:
-  pdf:
-    toc: true
-    number-sections: true
-    colorlinks: true
-    papersize: a4
+date: "2025-10-04"
 execute:
     echo: false
 ---

@@ -55,3 +55,9 @@ Dockerfile2
 *.html
 *_files/
 draft/
+
+# Quarto
+_site/
+.quarto/
+
+/.quarto/

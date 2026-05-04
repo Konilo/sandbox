@@ -1,13 +1,8 @@
 ---
 title: "Artprice100©"
 author: "Konilo Zio"
-date: "`r Sys.time()`"
-toc: true
-format:
-  pdf:
-    toc: true
-    number-sections: true
-    colorlinks: true
+date: "2025-07-20"
+date-modified: "2025-10-06"
 execute:
     echo: false
 ---

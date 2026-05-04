@@ -1,14 +1,7 @@
 ---
 title: "Leveraged ETFs -- The Case Of CL2"
 author: "Konilo Zio"
-date: "`r Sys.time()`"
-toc: true
-format:
-  pdf:
-    toc: true
-    number-sections: true
-    colorlinks: true
-    papersize: a4
+date: "2025-08-03"
 execute:
     echo: false
 ---

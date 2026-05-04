@@ -1,13 +1,8 @@
 ---
 title: "Portfolio Contribution Complexities"
 author: "Konilo Zio"
-date: "`r Sys.time()`"
-format:
-  pdf:
-    toc: true
-    number-sections: true
-    colorlinks: true
-    papersize: a4
+date: "2026-05-02"
+date-modified: "2026-05-04"
 execute:
     echo: false
 ---

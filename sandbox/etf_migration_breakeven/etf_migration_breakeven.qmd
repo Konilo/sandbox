@@ -1,7 +1,8 @@
 ---
 title: "When to Migrate Away From an Expensive ETF to a Cheaper, Equivalent One?"
 author: "Konilo Zio"
-date: "`r Sys.time()`"
+date: "2025-09-15"
+date-modified: "2025-11-08"
 execute:
     echo: false
 ---

@@ -9,7 +9,6 @@ execute:
 
 ```{r}
 #| label: setup
-#| echo: false
 #| output: false
 
 # record t0 (see the appendix)
@@ -94,6 +93,7 @@ When selling is allowed, computing each asset's adjustment (i.e., "buy x €" or
 ```{r}
 #| label: allocate-with-selling
 #| echo: true
+#| code-fold: false
 
 allocate_with_selling <- function(v_pre, tw, C) {
     stopifnot(
@@ -114,6 +114,7 @@ Reusing the portfolio from the pre-contribution situation above:
 ```{r}
 #| label: example-with-selling
 #| echo: true
+#| code-fold: false
 
 allocate_with_selling(v_pre = c(28500, 1500), tw = c(0.9, 0.1), C = 1000)
 # expected: -600, 1600
@@ -237,6 +238,7 @@ The function below implements the algorithm from the previous section. The varia
 ```{r}
 #| label: allocate
 #| echo: true
+#| code-fold: false
 
 allocate_no_selling <- function(v_pre, tw, C, verbose = FALSE) {
     stopifnot(
@@ -295,6 +297,7 @@ Three demo cases, mirroring the situations described above.
 ```{r}
 #| label: example-a
 #| echo: true
+#| code-fold: false
 
 allocate_no_selling(v_pre = c(9500, 500), tw = c(0.9, 0.1), C = 1000)
 # expected: 400, 600
@@ -305,6 +308,7 @@ allocate_no_selling(v_pre = c(9500, 500), tw = c(0.9, 0.1), C = 1000)
 ```{r}
 #| label: example-b1
 #| echo: true
+#| code-fold: false
 
 allocate_no_selling(v_pre = c(28500, 1500), tw = c(0.9, 0.1), C = 1000)
 # expected: 0, 1000
@@ -315,6 +319,7 @@ allocate_no_selling(v_pre = c(28500, 1500), tw = c(0.9, 0.1), C = 1000)
 ```{r}
 #| label: example-b2
 #| echo: true
+#| code-fold: false
 
 allocate_no_selling(v_pre = c(60, 45, 1), tw = c(0.5, 0.4, 0.1), C = 10, verbose = TRUE)
 # expected: 0, 0, 10

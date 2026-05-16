@@ -18,6 +18,10 @@ website:
       - icon: github
         href: https://github.com/Konilo/sandbox
         aria-label: GitHub
+  page-footer:
+    center: |
+      Code: [MIT](https://github.com/Konilo/sandbox/blob/main/LICENSE) ·
+      Text & figures: [CC BY 4.0](https://github.com/Konilo/sandbox/blob/main/LICENSE-CONTENT)
   sidebar:
     style: docked
     search: true

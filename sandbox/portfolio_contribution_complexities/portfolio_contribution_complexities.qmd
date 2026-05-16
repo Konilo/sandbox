@@ -2,7 +2,7 @@
 title: "Portfolio Contribution Complexities"
 author: "Konilo Zio"
 date: "2026-05-02"
-date-modified: "2026-05-04"
+date-modified: "2026-05-16"
 execute:
     echo: false
 ---
@@ -32,7 +32,7 @@ if (getwd() == "/workspaces/sandbox") {
 
 # Introduction
 
-When contributing to an investment portfolio that follows a strategy involving more than one asset -- each with its own target allocation -- while ruling out selling, computing the amount to contribute to each asset can be tricky. The study that follows explains that challenge and provides its solution. This solution is provided as a CLI tool available at [github.com/Konilo/dcallocate](https://github.com/Konilo/dcallocate).
+When contributing to an investment portfolio that follows a strategy involving more than one asset -- each with its own target allocation -- while ruling out selling (to minimize costs), computing the amount to contribute to each asset can be tricky. The study that follows explains that challenge and provides its solution. This solution is provided as a CLI tool called **`dcallocate`** available at [github.com/Konilo/dcallocate](https://github.com/Konilo/dcallocate).
 
 
 # No selling required to stay balanced -- the simplest case {#sec-no-selling-needed}
@@ -179,7 +179,7 @@ From an investor standpoint, that happens when between contributions, the assets
 From a mathematical standpoint, this shows up as $v_i^{\text{pre}} > \text{tv}_i^{\text{post}}$ for at least one asset, which means that we have at least one negative deficit ($d_i < 0$). When that happens, a more complex method is required to compute the $\Delta_i$.
 
 
-## The method
+## The method {#sec-method}
 
 1. Set $\Delta_i = 0$ for every overweight asset: no contribution for them. Those assets are "stuck", and the remaining ones are "non-stuck".
 2. Compute the post-contribution total value that the non-stuck assets must collectively reach ($V^\text{post}_N$).
@@ -220,6 +220,209 @@ $$
 $$
 
 (where the second equality uses $\sum_{i \in N} \text{tw}^*_i = 1$, and the third uses $V^\text{post}_N = V^\text{post} - \sum_{i \in S} v_i^\text{pre}$.) So when the recursion terminates with all surviving $d^*_i \geq 0$, setting $\Delta_i = d^*_i$ for $i \in N$ uses exactly the $C$ € available and lands every survivor on its renormalized target value $\text{tv}^{\text{post},*}_i$.
+
+
+## A physical water-filling model, for intuition {#sec-phys-mod}
+
+This physical model provides an intuitive understanding of the water-filling algorithm and explains why it's sometimes called that way.
+
+- Each asset is represented by a solid block with the following attributes:
+    - width = target weight, in %
+    - height ($h$) = value / target weight (arbitrary unit)
+    - surface = height $\times$ width = target weight $\times$ value / target weight = value ($v$), in €
+- The $C$ € contribution is represented as water and is poured over the top asset (but pouring it anywhere would work just as well), that's the blue arrow.
+- That water/contribution recursively flows on top of any lower block/asset: it acts like water would, which exactly matches the algorithm described in @sec-method.
+- Any block/asset that ends up without water/contribution above itself is stuck, that's what the red highlighting shows.
+- The deficit of each asset -- the contribution it is granted -- corresponds to the $d*$ euro amount represented as the surface of water on top of each block/asset.
+
+Below are four demo cases showing the model in action.
+
+```{r}
+#| label: water-filling-plot-fn
+#| echo: false
+
+plot_water_filling <- function(
+    v_pre,
+    tw,
+    C,
+    asset_labels = NULL,
+    y_max = NULL
+) {
+
+    # Fixed decimal notation, space thousands separator, no trailing zeros.
+    fmt_num <- function(x) {
+        formatC(
+            x,
+            format = "f", digits = 2,
+            big.mark = " ", drop0trailing = TRUE
+        )
+    }
+
+    stopifnot(
+        length(v_pre) == length(tw),
+        all(tw > 0),
+        abs(sum(tw) - 1) < 1e-9,
+        C >= 0
+    )
+
+    n <- length(v_pre)
+    if (is.null(asset_labels)) asset_labels <- paste("Asset", seq_len(n))
+
+    heights <- v_pre / tw
+    V_post <- sum(v_pre) + C
+
+    # Solve the no-selling allocation: find the stuck set, h*, and deficits.
+    stuck <- rep(FALSE, n)
+    repeat {
+        h_star <- (V_post - sum(v_pre[stuck])) / sum(tw[!stuck])
+        newly_stuck <- (heights > h_star) & !stuck
+        if (!any(newly_stuck)) break
+        stuck <- stuck | newly_stuck
+    }
+    deficit <- ifelse(stuck, 0, (h_star - heights) * tw)
+
+    # Sort by height descending so the tallest pedestal sits on the left.
+    ord <- order(heights, decreasing = TRUE)
+    tw_ord       <- tw[ord]
+    h_ord        <- heights[ord]
+    v_ord        <- v_pre[ord]
+    deficit_ord  <- deficit[ord]
+    stuck_ord    <- stuck[ord]
+    labels_ord   <- asset_labels[ord]
+
+    x_starts <- c(0, cumsum(tw_ord)[-n])
+    x_ends   <- cumsum(tw_ord)
+
+    d <- data.table(
+        asset = factor(labels_ord, levels = labels_ord),
+        xmin = x_starts,
+        xmax = x_ends,
+        pedestal_top = h_ord,
+        tw = tw_ord,
+        v = v_ord,
+        deficit = deficit_ord,
+        stuck = stuck_ord
+    )
+
+    if (is.null(y_max)) y_max <- max(heights, h_star) * 1.22
+
+    # Pour arrow lands on the tallest pedestal (leftmost after sort).
+    arrow_x <- d[1, (xmin + xmax) / 2]
+    arrow_y_top    <- y_max * 0.95
+    arrow_y_bottom <- d[1, pedestal_top] + (y_max - d[1, pedestal_top]) * 0.20
+
+    ggplot(d) +
+        # water above non-stuck pedestals
+        geom_rect(
+            data = d[stuck == FALSE],
+            aes(xmin = xmin, xmax = xmax, ymin = pedestal_top, ymax = h_star),
+            fill = "#9ec5f7", colour = NA
+        ) +
+        # pedestals
+        geom_rect(
+            aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = pedestal_top, fill = asset),
+            colour = "white", linewidth = 0.5
+        ) +
+        # red outline on stuck pedestals (islands)
+        geom_rect(
+            data = d[stuck == TRUE],
+            aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = pedestal_top),
+            fill = NA, colour = "#cc1f1a", linewidth = 1
+        ) +
+        # in-pedestal labels (asset id, tw, v, height)
+        geom_text(
+            aes(
+                x = (xmin + xmax) / 2,
+                y = pedestal_top / 2,
+                label = paste0(
+                    asset,
+                    "\ntw = ", vapply(tw, fmt_num, ""),
+                    "\nv = ", vapply(v, fmt_num, ""), " €",
+                    "\nh = ", vapply(pedestal_top, fmt_num, "")
+                )
+            ),
+            size = 2.8, colour = "grey15"
+        ) +
+        # in-water-column deficit labels
+        geom_text(
+            data = d[stuck == FALSE],
+            aes(
+                x = (xmin + xmax) / 2,
+                y = (pedestal_top + h_star) / 2,
+                label = paste0("d* = ", vapply(deficit, fmt_num, ""), " €")
+            ),
+            colour = "grey15", size = 3.4, fontface = "bold"
+        ) +
+        # pour-arrow on the tallest pedestal
+        annotate(
+            "segment",
+            x = arrow_x, y = arrow_y_top,
+            xend = arrow_x, yend = arrow_y_bottom,
+            arrow = grid::arrow(length = unit(0.3, "cm"), type = "closed"),
+            colour = "#1f6dde", linewidth = 0.9
+        ) +
+        annotate(
+            "text", x = arrow_x, y = arrow_y_top,
+            label = paste0("pour C = ", fmt_num(C), " €"),
+            hjust = 0.5, vjust = -0.6, colour = "#1f6dde", size = 3.3,
+            fontface = "bold"
+        ) +
+        scale_fill_brewer(palette = "Dark2", guide = "none") +
+        scale_x_continuous(
+            "Cumulative target weight",
+            expand = expansion(mult = c(0.02, 0.15))
+        ) +
+        scale_y_continuous(
+            "Height (no unit) = value / target weight",
+            limits = c(0, y_max)
+        ) +
+        labs(caption = "Blocks sorted tallest to shortest") +
+        theme_minimal(base_size = 11) +
+        theme(panel.grid.minor = element_blank())
+}
+```
+
+```{r}
+#| fig-cap: "Demo case 1: no recursion (no asset is stuck)"
+
+plot_water_filling(
+    v_pre = c(9500, 500),
+    tw    = c(0.9,  0.1),
+    C     = 1000,
+    asset_labels = c("Index ETF", "Managed-futures ETF")
+)
+```
+
+```{r}
+#| fig-cap: "Demo case 2: single recursion (Index ETF stuck)"
+
+plot_water_filling(
+    v_pre = c(28500, 1500),
+    tw    = c(0.9,   0.1),
+    C     = 1000,
+    asset_labels = c("Index ETF", "Managed-futures ETF")
+)
+```
+
+```{r}
+#| fig-cap: "Demo case 3: two recursions (assets 1 and 2 stuck)"
+
+plot_water_filling(
+    v_pre = c(60,  45,  1),
+    tw    = c(0.5, 0.4, 0.1),
+    C     = 10
+)
+```
+
+```{r}
+#| fig-cap: "Demo case 4: one stuck, two active getting different deficits"
+
+plot_water_filling(
+    v_pre = c(30,  20,  10),
+    tw    = c(0.3, 0.4, 0.3),
+    C     = 10
+)
+```
 
 
 ## Implementation in R
@@ -290,7 +493,7 @@ allocate_no_selling <- function(v_pre, tw, C, verbose = FALSE) {
 
 ### Demo cases
 
-Three demo cases, mirroring the situations described above.
+Four demo cases, mirroring the ones of @sec-phys-mod.
 
 1. **No recursion needed:** reusing the portfolio from @sec-no-selling-needed:
 
@@ -325,10 +528,22 @@ allocate_no_selling(v_pre = c(60, 45, 1), tw = c(0.5, 0.4, 0.1), C = 10, verbose
 # expected: 0, 0, 10
 ```
 
+4. **Mixed**: one stuck, two active with different deficits:
+
+```{r}
+#| label: example-b3
+#| echo: true
+#| code-fold: false
+
+allocate_no_selling(v_pre = c(30,  20,  10), tw = c(0.3, 0.4, 0.3), C = 10)
+# expected: 0, ~2.9, ~7.1
+```
+
 
 # Appendix
 
 This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+
 ```{r}
 #| label: appendix
 

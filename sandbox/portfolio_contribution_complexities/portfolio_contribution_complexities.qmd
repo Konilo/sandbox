@@ -363,7 +363,7 @@ plot_water_filling <- function(
         ) +
         annotate(
             "text", x = arrow_x, y = arrow_y_top,
-            label = paste0("pour C = ", fmt_num(C), " €"),
+            label = paste0("Pour C = ", fmt_num(C), " €"),
             hjust = 0.5, vjust = -0.6, colour = "#1f6dde", size = 3.3,
             fontface = "bold"
         ) +

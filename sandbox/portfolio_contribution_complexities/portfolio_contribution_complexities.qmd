@@ -2,7 +2,7 @@
 title: "Portfolio Contribution Complexities"
 author: "Konilo Zio"
 date: "2026-05-02"
-date-modified: "2026-05-16"
+date-modified: "2026-05-17"
 execute:
     echo: false
 ---
@@ -18,6 +18,7 @@ t0 <- proc.time()
 library(data.table)
 library(ggplot2)
 library(knitr)
+library(latex2exp)
 
 # Runs when executing R interactively (because /workspaces/sandbox/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
@@ -230,10 +231,12 @@ This physical model provides an intuitive understanding of the water-filling alg
     - width = target weight, in %
     - height ($h$) = value / target weight (arbitrary unit)
     - surface = height $\times$ width = target weight $\times$ value / target weight = value ($v$), in €
+- Hence, a balanced portfolio is characterized by blocks (assets) of equal heights.
 - The $C$ € contribution is represented as water and is poured over the top asset (but pouring it anywhere would work just as well), that's the blue arrow.
-- That water/contribution recursively flows on top of any lower block/asset: it acts like water would, which exactly matches the algorithm described in @sec-method.
-- Any block/asset that ends up without water/contribution above itself is stuck, that's what the red highlighting shows.
-- The deficit of each asset -- the contribution it is granted -- corresponds to the $d*$ euro amount represented as the surface of water on top of each block/asset.
+- That water (contribution) recursively flows on top of any lower block (asset): it acts like real water would and exactly matches the algorithm described in @sec-method.
+- Any block (asset) that ends up without water (contribution) above itself is stuck: that's what the red highlighting shows.
+- The contribution each asset is granted corresponds to the $\Delta$ euro amount represented as the surface of water on top of each block.
+- After pouring water (contributing), the portfolio reached balance if the combined block height and water height is identical for all assets.
 
 Below are four demo cases showing the model in action.
 
@@ -271,7 +274,7 @@ plot_water_filling <- function(
     heights <- v_pre / tw
     V_post <- sum(v_pre) + C
 
-    # Solve the no-selling allocation: find the stuck set, h*, and deficits.
+    # Solve the no-selling allocation: find the stuck set, h*, and Deltas.
     stuck <- rep(FALSE, n)
     repeat {
         h_star <- (V_post - sum(v_pre[stuck])) / sum(tw[!stuck])
@@ -279,16 +282,16 @@ plot_water_filling <- function(
         if (!any(newly_stuck)) break
         stuck <- stuck | newly_stuck
     }
-    deficit <- ifelse(stuck, 0, (h_star - heights) * tw)
+    delta <- ifelse(stuck, 0, (h_star - heights) * tw)
 
     # Sort by height descending so the tallest pedestal sits on the left.
     ord <- order(heights, decreasing = TRUE)
-    tw_ord       <- tw[ord]
-    h_ord        <- heights[ord]
-    v_ord        <- v_pre[ord]
-    deficit_ord  <- deficit[ord]
-    stuck_ord    <- stuck[ord]
-    labels_ord   <- asset_labels[ord]
+    tw_ord     <- tw[ord]
+    h_ord      <- heights[ord]
+    v_ord      <- v_pre[ord]
+    delta_ord  <- delta[ord]
+    stuck_ord  <- stuck[ord]
+    labels_ord <- asset_labels[ord]
 
     x_starts <- c(0, cumsum(tw_ord)[-n])
     x_ends   <- cumsum(tw_ord)
@@ -300,7 +303,7 @@ plot_water_filling <- function(
         pedestal_top = h_ord,
         tw = tw_ord,
         v = v_ord,
-        deficit = deficit_ord,
+        delta = delta_ord,
         stuck = stuck_ord
     )
 
@@ -343,15 +346,19 @@ plot_water_filling <- function(
             ),
             size = 2.8, colour = "grey15"
         ) +
-        # in-water-column deficit labels
+        # in-water-column Delta labels
         geom_text(
             data = d[stuck == FALSE],
             aes(
                 x = (xmin + xmax) / 2,
                 y = (pedestal_top + h_star) / 2,
-                label = paste0("d* = ", vapply(deficit, fmt_num, ""), " €")
+                label = TeX(
+                    paste0("$\\Delta = ", vapply(delta, fmt_num, ""), "$ €"),
+                    output = "character"
+                )
             ),
-            colour = "grey15", size = 3.4, fontface = "bold"
+            colour = "grey15", size = 3.4, fontface = "bold",
+            parse = TRUE
         ) +
         # pour-arrow on the tallest pedestal
         annotate(
@@ -383,7 +390,8 @@ plot_water_filling <- function(
 ```
 
 ```{r}
-#| fig-cap: "Demo case 1: no recursion (no asset is stuck)"
+#| label: fig-demo-case-1
+#| fig-cap: "Demo case 1: no recursion (no asset is stuck). Cf. [demo case 1 in section 6.4.1](#demo-case-1) for the algorithm demo."
 
 plot_water_filling(
     v_pre = c(9500, 500),
@@ -394,7 +402,8 @@ plot_water_filling(
 ```
 
 ```{r}
-#| fig-cap: "Demo case 2: single recursion (Index ETF stuck)"
+#| label: fig-demo-case-2
+#| fig-cap: "Demo case 2: single recursion (Index ETF stuck). Cf. [demo case 2 in section 6.4.1](#demo-case-2) for the algorithm demo."
 
 plot_water_filling(
     v_pre = c(28500, 1500),
@@ -405,7 +414,8 @@ plot_water_filling(
 ```
 
 ```{r}
-#| fig-cap: "Demo case 3: two recursions (assets 1 and 2 stuck)"
+#| label: fig-demo-case-3
+#| fig-cap: "Demo case 3: two recursions (assets 1 and 2 stuck). Cf. [demo case 3 in section 6.4.1](#demo-case-3) for the algorithm demo."
 
 plot_water_filling(
     v_pre = c(60,  45,  1),
@@ -415,7 +425,8 @@ plot_water_filling(
 ```
 
 ```{r}
-#| fig-cap: "Demo case 4: one stuck, two active getting different deficits"
+#| label: fig-demo-case-4
+#| fig-cap: "Demo case 4: one stuck asset & two non-stuck assets getting different $\\Delta$s. Cf. [demo case 4 in section 6.4.1](#demo-case-4) for the algorithm demo."
 
 plot_water_filling(
     v_pre = c(30,  20,  10),
@@ -495,7 +506,7 @@ allocate_no_selling <- function(v_pre, tw, C, verbose = FALSE) {
 
 Four demo cases, mirroring the ones of @sec-phys-mod.
 
-1. **No recursion needed:** reusing the portfolio from @sec-no-selling-needed:
+1. []{#demo-case-1} **No recursion needed:** reusing the portfolio from @sec-no-selling-needed (cf. @fig-demo-case-1 for the physical model demo):
 
 ```{r}
 #| label: example-a
@@ -506,7 +517,7 @@ allocate_no_selling(v_pre = c(9500, 500), tw = c(0.9, 0.1), C = 1000)
 # expected: 400, 600
 ```
 
-2. **Single recursion step:** the portfolio from @sec-selling-allowed, but applying the no-selling rule from @sec-deficits-negative -- the index ETF gets stuck and all cash goes to the managed-futures ETF:
+2. []{#demo-case-2} **Single recursion step:** the portfolio from @sec-selling-allowed, but applying the no-selling rule from @sec-deficits-negative -- the index ETF gets stuck and all cash goes to the managed-futures ETF (cf. @fig-demo-case-2 for the physical model demo):
 
 ```{r}
 #| label: example-b1
@@ -517,7 +528,7 @@ allocate_no_selling(v_pre = c(28500, 1500), tw = c(0.9, 0.1), C = 1000)
 # expected: 0, 1000
 ```
 
-3. **Two recursion steps:** a 3-asset portfolio where one asset is initially overweight, and dropping it reveals a second overweight asset via renormalization (running with `verbose = TRUE` to trace the iterations):
+3. []{#demo-case-3} **Two recursion steps:** a 3-asset portfolio where one asset is initially overweight, and dropping it reveals a second overweight asset via renormalization, running with `verbose = TRUE` to trace the iterations (cf. @fig-demo-case-3 for the physical model demo):
 
 ```{r}
 #| label: example-b2
@@ -528,7 +539,7 @@ allocate_no_selling(v_pre = c(60, 45, 1), tw = c(0.5, 0.4, 0.1), C = 10, verbose
 # expected: 0, 0, 10
 ```
 
-4. **Mixed**: one stuck, two active with different deficits:
+4. []{#demo-case-4} **One recursion step and >1 non-stuck asset**: a 3-asset portfolio where one asset is stuck while the two non-stuck ones get different $\Delta$s (cf. @fig-demo-case-4 for the physical model demo):
 
 ```{r}
 #| label: example-b3
@@ -536,7 +547,7 @@ allocate_no_selling(v_pre = c(60, 45, 1), tw = c(0.5, 0.4, 0.1), C = 10, verbose
 #| code-fold: false
 
 allocate_no_selling(v_pre = c(30,  20,  10), tw = c(0.3, 0.4, 0.3), C = 10)
-# expected: 0, ~2.9, ~7.1
+# expected: 0, ~2.86, ~7.14
 ```
 
 

@@ -18,7 +18,6 @@ t0 <- proc.time()
 library(data.table)
 library(ggplot2)
 library(knitr)
-library(latex2exp)
 
 # Runs when executing R interactively (because /workspaces/sandbox/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
@@ -352,13 +351,9 @@ plot_water_filling <- function(
             aes(
                 x = (xmin + xmax) / 2,
                 y = (pedestal_top + h_star) / 2,
-                label = TeX(
-                    paste0("$\\Delta = ", vapply(delta, fmt_num, ""), "$ €"),
-                    output = "character"
-                )
+                label = paste0("Δ = ", vapply(delta, fmt_num, ""), " €")
             ),
-            colour = "grey15", size = 3.4, fontface = "bold",
-            parse = TRUE
+            colour = "grey15", size = 3.4, fontface = "bold"
         ) +
         # pour-arrow on the tallest pedestal
         annotate(

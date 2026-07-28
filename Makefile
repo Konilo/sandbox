@@ -1,10 +1,10 @@
 .PHONY: preview render clean
 
 preview:
-	quarto preview
+	uv run quarto preview
 
 render:
-	quarto render
+	uv run quarto render
 
 clean:
 	rm -rf _site .quarto

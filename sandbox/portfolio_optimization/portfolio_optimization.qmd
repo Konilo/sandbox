@@ -1,0 +1,469 @@
+---
+title: "Portfolio Optimization"
+author: "Konilo Zio"
+date: "2026-07-24"
+date-modified: "2026-07-25"
+execute:
+    echo: false
+jupyter: python3
+---
+
+# Introduction
+
+I want to determine a humbly-optimized strategy for my long-term investment portfolio.
+
+My goal is to maximize the [utility](https://en.wikipedia.org/wiki/Utility) I will derive from this portfolio. Assuming constant relative risk aversion and a utility function of following form, as per [Merton's portfolio problem](https://en.wikipedia.org/wiki/Merton's_portfolio_problem):
+
+$$
+u(x) = \frac{x^{1-\gamma}}{1-\gamma}
+$$
+
+where
+
+- $u(x)$ is the utility derived from an $x$ level of wealth (which is consumed to produce utility)
+- $x$ is the amount of wealth consumed
+- and $\gamma$ is a constant measuring the level of risk aversion
+
+I estimated that, personnally, $\gamma = 2$. This estimation is out of the scope of this study, see Haghani & White ([2018](https://elmwealth.com/measuring-the-fabric-of-felicity/)) for an introduction.
+
+@fig-crra-utility shows the shape of my utility function: utility rises with consumed wealth but with decreasing marginal return, and $\gamma$ sets how fast that marginal rate of return decays.
+
+```{python}
+#| label: fig-crra-utility
+#| fig-cap: "CRRA utility of consumed wealth, for my $\\gamma = 2$ and two other risk aversion levels, for comparison. (Utility is ordinal -- only the curvature and the comparison of values are meaningful, not the values alone.)"
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0.5, 5, 400)
+crra_gammas = [(1.5, "#E69F00", 1.2), (2.0, "#0072B2", 2.2), (3.0, "#009E73", 1.2)]
+
+fig, ax = plt.subplots(figsize=(8, 4))
+for gamma, color, linewidth in crra_gammas:
+    ax.plot(
+        x,
+        x ** (1 - gamma) / (1 - gamma),
+        color=color,
+        linewidth=linewidth,
+        label=f"γ = {gamma:g}",
+    )
+ax.set_xlim(x.min(), x.max())
+ax.set_ylim(-3, 0.15)
+ax.set_xlabel("Wealth consumed, x")
+ax.set_ylabel("Utility, u(x)")
+ax.legend(frameon=False, ncol=3, loc="lower right")
+ax.grid(True, axis="y", color="0.92")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+I am designing this strategy to be implemented in an [Interactive Brokers (IBKR) *compte-titre ordinaire* (CTO)](https://www.interactivebrokers.ie/en/accounts/individual.php?menu=B) as a French citizen. This choice implies that I would have access to a wide array of instruments.
+
+I have already defined the universe of assets I will consider and submit to the optimization (all EUR-denominated):
+
+- an [MSCI ACWI](https://www.msci.com/indexes/index/892400/msci-acwi-index) ETF;
+- a global, government, EUR-hedged bond ETF such as [DBZB](https://etf.dws.com/en-gb/LU0378818131-global-government-bond-ucits-etf-1c-eur-hedged/);
+- a [managed futures](https://www.aqr.com/Insights/Research/White-Papers/Understanding-Managed-Futures) ETF such as [DBMFE](https://www.imgp.com/fund/LU2951555403-imgp-dbi-managed-futures-fund-r-eur-ucits-etf/) (ideally, several ones to diversify the manager risk);
+- and a gold ETF.
+
+The definition of this universe is out of scope but was inspired, between others, by Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)).
+
+An IBKR CTO allows the implementation of short box spreads for fixed-rate, low-cost leverage. The derivation of the properties of this combination of options is fascinating but also kept out of the scope of this study, see [Wikipedia](https://en.wikipedia.org/wiki/Box_spread).
+
+Analytical process:
+
+- I will first define the inputs of the optimizer -- the assets' expected return, volatility and correlation. This step is very challenging, hence, I will employ techniques designed to keep those estimates humble and as evidence-based as possible.
+- I will then run mean-variance optimization (MVO) on those inputs to identify the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio), as per the modern portfolio theory. MVO being theoretically exact but practically very sensitive to the fraction of error in the inputs, I will correct this result by tilting the assets' weights toward a conservative anchor.
+- Finally, I will solve for the amount of leverage to apply to this optimized portfolio to maximize utility.
+
+To summarize, the challenge is to estimate the portfolio of assets that will maximize the expected return per unit of risk taken, and then leverage it to the level of risk that best suits my psychology (@eq-challenge).
+
+$$
+\underbrace{\frac{\text{return}}{\text{risk}}}_{\text{to maximize}} \times \underbrace{\text{leverage}}_{\text{to adapt to my risk aversion level}}
+$$ {#eq-challenge}
+
+
+# Historical returns
+
+Historical returns are important, but not sufficient, factors in the determination of the optimizer's inputs. They are estimated from long-history proxies for the actual ETFs I would invest in because those ETFs are too recent. Return time series are monthly and denominated in EUR.
+
+| Sleeve | Proxy | Currency handling | Native time range | Source |
+|---|---|---|---|---|
+| Equity | MSCI World Standard (Large+Mid), Net | EUR (native) | 2001-01 to 2026-06 | [MSCI](https://app2.msci.com/products/index-data-search/regional_chart.jsp?asOf=24/Jul/2026&size=Standard%20(Large%2BMid%20Cap)&scope=R&style=None&currency=EUR&priceLevel=NETR&indexId=990100&indexName=WORLD&suite=C) |
+| Bonds | FTSE WGBI Developed, EUR-hedged | EUR-hedged (native) | 1985-02 to 2026-04 | [Curvo](https://curvo.eu/backtest/en/market-index/ftse-world-government-bond-developed-markets-hedged-eur?currency=eur) |
+| Trend | SG CTA Index, net-of-fee | USD (native) converted to EUR, unhedged | 2000-01 to 2026-07 | [SG Prime Services](https://wholesale.banking.societegenerale.com/en/prime-services-indices/) (index), [Curvo](https://curvo.eu/backtest/data/eur-usd.json) (EUR/USD) |
+| Gold | LBMA PM gold fix | EUR (native) | 1999-02 to 2026-07 | [LBMA](https://prices.lbma.org.uk/json/gold_pm.json) |
+: Return time series used as proxies for the study {#tbl-data}
+
+The SG CTA Index is the live, net-of-fee return of a [pool of the largest managed-futures CTAs](https://wholesale.banking.societegenerale.com/fileadmin/indices_feeds/SG_CTA_Index_Constituents.pdf). It is a good proxy for DBMFE (which uses it as its benchmark). DBMFE is an unhedged, EUR-denominated share class, so I simply convert the USD index to EUR and leave it unhedged.
+
+The resulting cross-sectionally-complete time frame is 2001-01 to 2026-04 (~25 years, 304 months). It spans the bear market that followed the dot-com bubble, the GFC, the Covid crisis, and the 2022 stock–bond correlation sign flip.
+
+```{python}
+#| label: setup
+#| include: false
+import sys
+
+# The study's Python modules live in src/.
+sys.path.insert(0, "src")
+```
+
+```{python}
+#| label: tbl-data-summary
+import pandas as pd
+
+from data import monthly_returns_matrix
+
+returns = monthly_returns_matrix()
+```
+
+@tbl-data-vol shows the annualized volatilities of each sleeve.
+```{python}
+#| label: tbl-data-vol
+#| tbl-cap: "Annualized volatility of each sleeve's proxy."
+pd.DataFrame({"Annualized volatility": (returns.std() * 12**0.5).map("{:.1%}".format)})
+```
+
+The numbers above are full-period averages that hide large regime shifts, most starkly for bonds: their volatility stood near 3% through the [ZIRP/QE](https://www.investopedia.com/articles/investing/031815/what-zero-interestrate-policy-zirp.asp) decades and roughly doubled after 2020 (@fig-rolling-vol). @fig-rolling-vol shows each sleeve's 36-month rolling annualized volatility.
+
+```{python}
+#| label: fig-rolling-vol
+#| fig-cap: "36-month rolling annualized volatility of each sleeve."
+import matplotlib.pyplot as plt
+
+from matplotlib.ticker import PercentFormatter
+
+from regimes import rolling_volatility
+
+rvol = rolling_volatility(returns)
+vol_colors = {"equity": "#CC79A7", "bonds": "#0072B2", "trend": "#009E73", "gold": "#E69F00"}
+
+fig, ax = plt.subplots(figsize=(8, 4))
+for sleeve in rvol.columns:
+    ax.plot(rvol.index, rvol[sleeve], color=vol_colors[sleeve], linewidth=1.5, label=sleeve)
+ax.set_ylim(bottom=0)
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+ax.set_ylabel("Annualized volatility")
+ax.legend(frameon=False, ncol=4, loc="upper center")
+ax.grid(True, axis="y", color="0.92")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+@tbl-data-corr shows the correlations between each pair of sleeves during the time period under study. As for volatilities, those single unmbers hide the regime changes that occured during the period. We will come back to that.
+```{python}
+#| label: tbl-data-corr
+#| tbl-cap: "Correlation matrix of the sleeves' historical returns."
+returns.corr().round(2)
+```
+
+
+# Computing the inputs of the mean-variance optimizer
+## Covariance matrix
+
+The first input we will tackle is the covariance matrix.
+
+
+### Historical covariances & Ledoit-Wolf shrinkage
+
+```{python}
+#| label: ledoit-wolf
+import numpy as np
+
+from covariance import ledoit_wolf_covariance, correlation
+
+cov_lw, delta = ledoit_wolf_covariance(returns)
+delta_fmt = f"{delta:.2f}"
+
+# Shrinkage target: the average of the off-diagonal sample correlations.
+sample_corr = returns.corr()
+off_diagonal = ~np.eye(len(sample_corr), dtype=bool)
+avg_corr_fmt = f"{sample_corr.values[off_diagonal].mean():.2f}"
+```
+
+The sample of historical returns allow us to compute a covariance matrix. But, as per Ledoit & Wolf, [2003](http://www.ledoit.net/honey.pdf), "obody should be using the sample
+covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} delta_fmt` by the Ledoit-Wolf estimator. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage). The problem targetted by Ledit & Wolf is most important in cases where the number of assets surpasses the number of observations in each returns time series which is far from our case, by we apply that method for robustness.
+
+```{python}
+#| label: tbl-shrinkage
+#| tbl-cap: "Ledoit-Wolf-shrunk covariance matrix."
+correlation(cov_lw).round(2)
+```
+
+@tbl-shrinkage-shift shows how much the shrinkage moved each correlation (shrunk - sample) toward the `{python} avg_corr_fmt` average.
+
+```{python}
+#| label: tbl-shrinkage-shift
+#| tbl-cap: "Shifts caused by the Ledoit-Wolf shrinkage over the covariance matrix."
+(correlation(cov_lw) - returns.corr()).round(3)
+```
+
+
+### Regime inspection
+
+The correlations above -- sample or shrunk -- are full-period averages.
+They hide the evolution of the degree of comovement over time between the sleeves. The optimizer relies on covariances to find the best combination of assets (diversification) and maximize risk-adjusted returns.
+To be more specific, I want equities to be un- or anticorrelated relative to the other sleeves when equities crash. A negative average correlation doesn't provide enough time granularity to examine this.
+So it is important that we scrutinize those single numbers before feeding them to MVO. In @tbl-regime-corr, I bucket the 304 months by the sign of the equity return and compute each sleeve's correlation with equity within each bucket.
+
+```{python}
+#| label: tbl-regime-corr
+#| tbl-cap: "Correlation with equity by equity-state bucket."
+from regimes import conditional_correlations
+
+conditional_correlations(returns).round(2)
+```
+
+@tbl-regime-corr tells a different story than the average:
+
+- Bonds have been a risk-off hedge: increasingly negatively-correlated as equity weakens (down to -0.17 in the worst quartile).
+- Trend acted as a convex hedge: mildly positively-correlated with equity when equity rises (0.13), but turning slightly negative when equity falls (-0.06 to -0.09).
+- Gold acted as a tail hedge: roughly uncorrelated when equity rises or falls modestly, but negative (-0.17) in the worst quartile.
+
+The buckets in @tbl-regime-corr are static -- they pool months regardless of when they occured. @fig-rolling-corr instead shows how equity correlated with the other sleeves over the period, on a 36-month rolling window.
+
+```{python}
+#| label: fig-rolling-corr
+#| fig-cap: "36-month rolling correlation of each sleeve with equity."
+import matplotlib.pyplot as plt
+
+from regimes import rolling_correlations
+
+roll = rolling_correlations(returns)
+colors = {"bonds": "#0072B2", "trend": "#009E73", "gold": "#E69F00"}
+
+fig, ax = plt.subplots(figsize=(8, 4))
+for sleeve in roll.columns:
+    ax.plot(roll.index, roll[sleeve], color=colors[sleeve], linewidth=1.5, label=sleeve)
+ax.axhline(0, color="0.6", linewidth=0.8)
+ax.set_ylabel("Correlation with equity")
+ax.legend(frameon=False)
+ax.grid(True, axis="y", color="0.92")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+@fig-rolling-corr makes the instability even clearer.
+
+- As the [headlines](https://www.aqr.com/Insights/Perspectives/A-Positive-Stock-Bond-Correlation-Is-a-Terrible-Reason-to-Add-More-Equity-Risk-to-Your-Portfolio) said, the stock-bond correlation turned positive. It was negative for most of the period, but flipped sign around 2022 and reached a peak (in our sample) at +0.71 in 2025. The risk-off hedge of the 2000s and 2010s has, for now, become a risk-on co-mover.
+- Trend's correlation to stocks swings widely (from +0.77 in 2006 to -0.33 in 2024), consistent with its convex, regime-dependent profile.
+- And gold's was most stable (-0.34 to +0.37) albeit rarely substantially anticorrelated.
+
+
+### Cautious overrides
+
+The regime inspection makes me distrust one correlation (even shrunk): the equity-bonds one. Its 25-year average is roughly zero, but it flipped positive in 2022, peaked near 0.7 in 2025, and is still elevated (~0.5) at the sample end (@fig-rolling-corr). Feeding the optimizer a diversifying ~0 would let it lean on a bond hedge that I don't trust going forward. So I override it to a conservative 0.25 -- above the historical average, below the current regime -- and leave the other five correlations at their shrunk levels.
+
+I distrust bonds historical volatility for the same reason. Its 3.8 % sample figure leans on the structurally calm ZIRP/QE decades (2001-2019 ran ~3.0-3.1 %), but the post-2020 volatility regime has run at or above 5 %, the 36-month rolling vol now sits near 5.0 % (@fig-rolling-vol), and the ETF's own 3-year factsheet standard deviation is 4.48 % ([IGLE factsheet, iShares](https://www.ishares.com/uk/individual/en/products/310297/ishares-global-govt-bond-ucits-etf-eur-hedged-dist-fund)). So I raise it to 5 %. (This is a load-bearing input for the bond weight givne by MVO: the tangency's bond weight falls from ~68 % to ~53 % and equity doubles.)
+
+The non-equity sleeves' crisis-hedging value, which a single matrix cannot see, is not preserved here by editing the correlations. Instead, it will be handled downstream by the risk-parity anchor.
+
+
+@tbl-final-corr & @tbl-final-vol show the correlations & volatilities MVO will be fed.
+
+```{python}
+#| label: tbl-final-corr
+#| tbl-cap: "Final correlation matrix (equity-bonds overridden)."
+from covariance import annualized_vols, final_covariance
+
+rho_equity_bonds = 0.25
+sigma_bonds = 0.05
+cov_final = final_covariance(returns, rho_equity_bonds=rho_equity_bonds, sigma_bonds=sigma_bonds)
+correlation(cov_final).round(2)
+```
+
+```{python}
+#| label: tbl-final-vol
+#| tbl-cap: "Final annualized volatilities (bond vol overridden to 5%)."
+pd.DataFrame({"annualized vol": annualized_vols(cov_final).map("{:.1%}".format)})
+```
+
+
+## Expected returns
+
+The optimizer's second input is the expected return of each sleeve (we will use real rates). I heavily rely on the methods described by Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)) to compute them. So, we will estimate each sleeves expected return using historical data and/or forward-looking indicators as Ilmanen suggests.
+
+- **Bonds**
+    - Starting yield.
+    - DBZB's index -- the FTSE World Government Bond Index - Developed Markets -- yields 4.08 % to worst at 6.49 years effective duration ([FTSE](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026-07-26), but that is the local yield. Hedging to EUR costs ~0.9 pp^[Hedging a foreign bond to EUR gives up the currency-weighted foreign-minus-EUR short-rate differential (covered interest parity). This 0.9 pp is napkin math: the index is ~40 % USD, where that differential is currently ~2 pp, partly offset by its lower-rate JPY sleeve. It shifts the real figure by only ~±0.2 pp.], leaving ~3.2 % hedged nominal; minus ~2 % expected inflation (ECB, [2026](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives **~1.2 %** real.
+    - High confidence.
+- **Equity**
+    - Payout-adjusted cyclically-adjusted earnings yield (P-CAEY) (White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate: retained earnings, including buybacks, are grown forward at the earnings yield, so no separate buyback or growth term is added.
+    - I take Elm Wealth's own all-world P-CAEY, **4.03 %** real (2026-06-30) -- the figure the method's authors publish ([Elm Wealth](https://elmwealth.com/capital-market-assumptions/)).
+    - Medium confidence.
+- **Trend**
+    - No yield to anchor on, so the historical mean of the live proxy (Ilmanen's fallback where no forward yield exists).
+    - The SG CTA Index -- live, net-of-fee (sourced above) -- compounded 3.8 % nominal EUR (unhedged) over 2000-2026; minus ~2 % expected inflation (ECB, [2026](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives **~1.8 %** real.
+    - Low confidence: no forward yield anchor, and the mean stays backward-looking.
+- **Gold**
+    - No cashflow, so no forward anchor; long-run real return equals inflation (Ilmanen).
+    - **0 %** real.
+    - Low confidence.
+
+
+### Keeping the views honest
+
+Expected returns are the least reliable MVO inputs, which tempts one to shrink them toward a humble prior -- typically the equal-Sharpe vector, the returns that make every sleeve equally risk-efficient (risk parity; Hurst, Johnson & Ooi ([2010](https://www.aqr.com/-/media/AQR/Documents/Insights/White-Papers/Understanding-Risk-Parity.pdf)), [Wikipedia](https://en.wikipedia.org/wiki/Risk_parity)). But I don't go that route. That prior is volatility-scaled ($\text{prior}_i = \bar{S}\,\sigma_i$), so it awards the most volatile -- and least groundable -- sleeve the highest return: gold's honest 0 % real would be lifted to ~2 % just for being volatile. That fabricated return would also inflate the Sharpe, and the Sharpe sets the leverage ($k^* = S/\gamma\sigma$, later). Risk parity humility is about weights, not returns. So I keep my honest estimates (@tbl-mu) and only apply the risk parity tilt in the next section.
+
+```{python}
+#| label: tbl-mu
+#| tbl-cap: "Expected real returns."
+from mu import expected_returns
+
+mu = expected_returns(cov_final)
+pd.DataFrame({"Expected real return": mu.map("{:.2%}".format)})
+```
+
+
+# Determining the portfolio weights
+
+Now that we have our expected returns vector ($\mu$) and covariance matrix ($\Sigma$), we can run MVO to find the portfolio that, assuming those inputs, maximizes the risk-adjusted return i.e., the max-Sharpe portfolio or tangency portfolio. And since short box spreads give access to leverage at a rate that is near the risk-free one, the [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem#One_risk-free_asset) applies: the solution is to hold the max-Sharpe portfolio and leverage it to my risk aversion level (remember @eq-challenge?).
+
+But the tangency sits on a rounded peak and piles into the lowest-volatility sleeve, so its exact weights are ill-determined: a small change in $\mu$ or $\Sigma$ moves them a lot, even though the realised Sharpe stays near the peak (@fig-tangency-instability).
+
+```{python}
+#| label: fig-tangency-instability
+#| fig-cap: "Tangency instability. Each blue dot is the max-Sharpe portfolio after a small random shock (0.5 pp standard deviation, per sleeve) is added to each element of the $\\mu$ vector, placed by its bond weight and the Sharpe it realises under the true (non-shocked) $\\mu$ and $\\Sigma$. A 0.5 pp wobble sends the bond weight from near zero to nearly 90 % -- the weights are ill-determined -- but the peak (dashed) is forgiving, so estimation error costs little Sharpe: the cloud sits just below it. The ERC anchor (green) uses only $\\Sigma$, no $\\mu$, so it holds fixed under the shocks; off the efficient frontier it gives up more Sharpe, so blending toward it trades a little Sharpe for that stability. 400 draws, seed 0."
+import matplotlib.pyplot as plt
+import numpy as np
+
+from matplotlib.ticker import PercentFormatter
+from pypfopt import EfficientFrontier
+
+from composition import erc_weights, portfolio_performance, tangency_weights
+from mu import RF_REAL, expected_returns
+
+mu = expected_returns(cov_final)
+rng = np.random.default_rng(0)
+bond_weight, realised_sharpe = [], []
+for _ in range(400):
+    mu_shock = pd.Series(mu.values + rng.normal(0, 0.005, len(mu)), index=mu.index)
+    ef = EfficientFrontier(mu_shock, cov_final, weight_bounds=(0, 1))
+    ef.max_sharpe(risk_free_rate=RF_REAL)
+    w = pd.Series(ef.clean_weights()).reindex(mu.index)
+    bond_weight.append(w["bonds"])
+    realised_sharpe.append(portfolio_performance(w, mu, cov_final)[2])
+
+w_tan = tangency_weights(cov_final, mu)
+tan_bond, tan_sharpe = w_tan["bonds"], portfolio_performance(w_tan, mu, cov_final)[2]
+w_erc = erc_weights(cov_final)
+erc_bond, erc_sharpe = w_erc["bonds"], portfolio_performance(w_erc, mu, cov_final)[2]
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.axhline(tan_sharpe, color="0.6", linewidth=0.8, linestyle="--")
+ax.scatter(bond_weight, realised_sharpe, s=12, color="#0072B2", alpha=0.22, edgecolors="none")
+ax.scatter([tan_bond], [tan_sharpe], s=70, color="#D55E00", zorder=5)
+ax.annotate(
+    "tangency from the point-estimate μ",
+    (tan_bond, tan_sharpe),
+    textcoords="offset points",
+    xytext=(6, -14),
+    color="#D55E00",
+)
+ax.scatter(
+    [erc_bond],
+    [erc_sharpe],
+    s=80,
+    marker="D",
+    color="#009E73",
+    zorder=5,
+    edgecolors="white",
+    linewidths=0.6,
+)
+ax.annotate(
+    "ERC (μ-free: fixed under the shocks)",
+    (erc_bond, erc_sharpe),
+    textcoords="offset points",
+    xytext=(-4, 10),
+    ha="right",
+    color="#009E73",
+)
+ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+ax.set_xlabel("Bond weight of the perturbed tangency")
+ax.set_ylabel("Sharpe realised at the true μ, Σ")
+ax.grid(True, axis="y", color="0.92")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+So I do not hold the raw tangency. I blend it toward an equal-risk-contribution (ERC) anchor -- the portfolio in which every sleeve contributes the same risk -- by a factor $\lambda$:
+
+$$
+w(\lambda) = (1 - \lambda)\,w_\text{tangency} + \lambda\,w_\text{ERC}
+$$
+
+The ERC weights come from a light-weight convex solver validated against `riskfolio-lib`'s risk parity (Cajas, [2026](https://github.com/dcajasn/Riskfolio-Lib)). @tbl-composition shows all three portfolios; $\lambda$ is a swept robustness dial, here at 0.5.
+
+```{python}
+#| label: tbl-composition
+#| tbl-cap: "Unlevered risky-portfolio weights and performance (real, financed at $R_F$ = 0.19 %)."
+from composition import blend, erc_weights, portfolio_performance, tangency_weights
+from mu import expected_returns
+
+mu = expected_returns(cov_final)
+lam = 0.5
+w_tan = tangency_weights(cov_final, mu)
+w_erc = erc_weights(cov_final)
+w_blend = blend(w_tan, w_erc, lam)
+
+composition = pd.DataFrame({"tangency": w_tan, "ERC": w_erc, "blend (λ=0.5)": w_blend})
+stats = {}
+for name, w in composition.items():
+    r, s, sharpe = portfolio_performance(w, mu, cov_final)
+    stats[name] = {"E[r]": f"{r:.1%}", "σ": f"{s:.1%}", "Sharpe": f"{sharpe:.2f}"}
+display = (composition * 100).round(1).astype(str) + " %"
+pd.concat([display, pd.DataFrame(stats)])
+```
+
+Bonds is the largest sleeve, but the blend has trimmed the tangency's 52 % toward 49 % and lifted the smaller diversifiers -- gold, which the tangency drops to zero (its 0 % real return sits below the financing cost, so a levered return-seeker will not hold it), is restored to ~8 % purely for diversification -- at a modest Sharpe cost (0.32 to 0.30), cheap insurance against the weight instability of @fig-tangency-instability.
+
+
+# Applying leverage
+
+The blended portfolio's volatility (~5.7 %) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), reference 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the risky portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
+
+```{python}
+#| label: leverage-calc
+#| include: false
+from leverage import (
+    GAMMA,
+    levered_allocation,
+    levered_expected_return,
+    optimal_leverage,
+    target_volatility,
+)
+
+r_bl, s_bl, sh_bl = portfolio_performance(w_blend, mu, cov_final)
+k = optimal_leverage(sh_bl, s_bl, GAMMA)
+k_fmt = f"{k:.1f}×"
+sstar_fmt = f"{target_volatility(sh_bl, GAMMA):.1%}"
+erlev_fmt = f"{levered_expected_return(sh_bl, GAMMA):.1%}"
+```
+
+At $\gamma = 2$ that is a gross exposure of `{python} k_fmt`, a target volatility of `{python} sstar_fmt`, and an expected real return of `{python} erlev_fmt`. @tbl-leverage shows the resulting book as fractions of NAV: the financing leg (`cash/borrow`) is the box-spread borrowing.
+
+```{python}
+#| label: tbl-leverage
+#| tbl-cap: "The blended portfolio levered to the CRRA optimum (γ = 2), % of NAV."
+pd.DataFrame(
+    {"% NAV": (levered_allocation(w_blend, k) * 100).round(0).astype(int).astype(str) + " %"}
+)
+```
+
+The resulting $k^*$ is `{python} k_fmt`. But this is the unconstrained optimum, and a practical cap (portfolio margin, box-spread capacity) may bind below $k^*$ -- a binding cap tilts the composition away from the low-vol sleeves, which I handle next. The real financing rate above already trims $k^*$; any box-spread spread over the risk-free would trim it a little more. @tbl-leverage-gamma shows the sensitivity to $\gamma$.
+
+```{python}
+#| label: tbl-leverage-gamma
+#| tbl-cap: "Leverage, target volatility, and expected real return vs. risk aversion γ."
+rows = {}
+for g in [1.5, 2.0, 2.5, 3.0]:
+    rows[g] = {
+        "k* (leverage)": f"{optimal_leverage(sh_bl, s_bl, g):.2f}×",
+        "σ* (target vol)": f"{target_volatility(sh_bl, g):.1%}",
+        "E[r] real": f"{levered_expected_return(sh_bl, g):.1%}",
+    }
+pd.DataFrame(rows).T.rename_axis("γ")
+```

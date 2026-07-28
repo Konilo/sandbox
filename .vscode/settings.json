@@ -2,6 +2,7 @@
     "r.rterm.linux": "/usr/local/bin/R",
     "r.debugger.timeouts.startup": 100000,
     "quarto.render.previewType": "none",
+    "workbench.browser.openLocalhostLinks": false,
     "[python]": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "charliermarsh.ruff",
@@ -10,7 +11,7 @@
             "source.organizeImports": "explicit"
         }
     },
-    "python.terminal.activateEnvironment": false,
+    "python.terminal.activateEnvironment": true,
     "notebook.formatOnSave.enabled": true,
     "notebook.codeActionsOnSave": {
         "notebook.source.fixAll": "explicit"

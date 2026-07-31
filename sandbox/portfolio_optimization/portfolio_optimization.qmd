@@ -467,3 +467,154 @@ for g in [1.5, 2.0, 2.5, 3.0]:
     }
 pd.DataFrame(rows).T.rename_axis("γ")
 ```
+
+# Sensitivity & reliability
+
+I do not trust the point result on its own. What I can defend is *what the result is robust to*: reliability here means the **levered book barely moves across the plausible ranges of the inputs it is actually sensitive to** -- not that the inputs are right (there is no crystal ball). The pipeline has three stages, each with one knob, so I sweep one stage at a time (holding the others at baseline) and read every sweep through the same metric, the final levered book.
+
+$$
+\text{inputs}\;(\mu,\Sigma)\;\xrightarrow{\;[B]\ \text{MVO}\;}\;\text{tangency}\;\xrightarrow{\;[C]\ \text{blend}\ \lambda\;}\;\text{composition}\;\xrightarrow{\;[D]\ \text{lever}\ \gamma\;}\;\text{book}
+$$
+
+```{python}
+#| label: sens-setup
+#| include: false
+import sensitivity as sn
+
+MU_LEVELS = (0.030, 0.0403, 0.048)
+SIGMA_EQ_LEVELS = (None, 0.150, 0.165)
+RHO_LEVELS = (0.13, 0.25, 0.45)
+SIGMA_BONDS_LEVELS = (0.040, 0.050, 0.055)
+
+sens_grid = sn.factorial(MU_LEVELS, SIGMA_EQ_LEVELS, RHO_LEVELS, SIGMA_BONDS_LEVELS)
+sens_band = sn.decision_band(sens_grid)
+sens_me = sn.main_effects(sens_grid)
+sens_stress = sn.run_cell(
+    equity_mu=0.020, sigma_equity=0.165, rho_equity_bonds=0.45, sigma_bonds=0.055
+)
+sens_fmt = {
+    **{c: "{:.0%}" for c in sn.NAV_COLS},
+    "k*": "{:.2f}×", "σ*": "{:.1%}", "E[r]": "{:.1%}", "Sharpe": "{:.2f}",
+}
+
+n_cells = f"{len(sens_grid)}"
+k_lo = f"{sens_band.loc['k*', 'min']:.1f}×"
+k_hi = f"{sens_band.loc['k*', 'max']:.1f}×"
+k_stress = f"{sens_stress['k*']:.1f}×"
+sb_effect = f"{sens_me.iloc[0]['range']:.2f}×"
+bond_lo = f"{sens_band.loc['bonds %NAV', 'min']:.0%}"
+bond_hi = f"{sens_band.loc['bonds %NAV', 'max']:.0%}"
+
+ls_ends = sn.lambda_sweep((0.0, 1.0))
+sharpe_tan = f"{ls_ends['Sharpe'].iloc[0]:.2f}"
+sharpe_erc = f"{ls_ends['Sharpe'].iloc[-1]:.2f}"
+k_tan = f"{ls_ends['k*'].iloc[0]:.1f}×"
+k_erc = f"{ls_ends['k*'].iloc[-1]:.1f}×"
+
+# Frozen-input inertness: max |Δk*| from perturbing the held inputs.
+from covariance import correlation
+from mu import VIEWS_REAL
+
+_mu0, _cov0 = sn.build_inputs()
+_corr0 = correlation(_cov0)
+_base_k = sn.run_cell()["k*"]
+_gold_pairs = [("equity", "gold"), ("bonds", "gold"), ("trend", "gold")]
+_trend_sig = float(_cov0.loc["trend", "trend"] ** 0.5)
+_frozen = (
+    [{"extra_corr": {p: float(_corr0.loc[p]) + s for p in _gold_pairs}} for s in (0.15, -0.15)]
+    + [{"extra_mu": {"trend": VIEWS_REAL["trend"] + s}} for s in (0.01, -0.01)]
+    + [{"extra_vol": {"trend": _trend_sig + s}} for s in (0.02, -0.02)]
+)
+frozen_max = f"{max(abs(sn.run_cell(**p)['k*'] - _base_k) for p in _frozen):.2f}×"
+```
+
+## Stage B -- the MVO inputs
+
+Of the ~14 hand-set inputs, a cross-house audit puts the tangency's first-order sensitivity on four: the **bond volatility** I override (5.0 %; houses 3.9--4.5 %), the **equity--bonds correlation** I also override (0.25; houses 0.13--0.45), **equity $\mu$** (the widest disagreement, ~3.0--4.8 % real), and **equity $\sigma$** (my 13.9 % EUR-realized sits below every forward house's ~16 %). I run the full $3^4$ factorial over them (cheap at four assets, and it captures interactions and the worst corner); the base cell reproduces the book above exactly. The bond volatility earns a factorial slot rather than a one-at-a-time sweep because it is the single largest lever *and* it interacts with the correlation on the same sleeve -- both points the sweep below bears out.
+
+```{python}
+#| label: tbl-sens-band
+#| tbl-cap: "Stage B decision band: the levered book across the input factorial."
+sens_band.apply(lambda row: row.map(sens_fmt[row.name].format), axis=1)
+```
+
+Across all `{python} n_cells` cells the leverage stays in `{python} k_lo`--`{python} k_hi` and the structure mostly holds: gold is always the smallest sleeve and never zero, and bonds is the largest in every cell but one (the extreme high-equity-$\mu$, high-$\sigma_\text{bonds}$ corner, where the bond sleeve is trimmed enough for equity to overtake it). The main effects locate where the trust budget belongs:
+
+```{python}
+#| label: tbl-sens-maineffects
+#| tbl-cap: "Stage B main effects on k*: mean leverage at each axis's low and high level (averaged over the other axes), ranked by range."
+sens_me.map("{:.2f}×".format)
+```
+
+The ranking is unambiguous: the two dominant axes are both the bond sleeve's risk -- $\sigma_\text{bonds}$ (which alone swings $k^*$ by `{python} sb_effect`) and then $\rho_\text{eq-bonds}$ -- and both are $\Sigma$, not $\mu$. It is $\sigma_\text{bonds}$ that makes the bond leg the most mobile part of the book, ranging from `{python} bond_lo` to `{python} bond_hi` of NAV across the grid. The simultaneously-bearish **stress corner** (equity $\mu$ 2.0 %, $\sigma$ 16.5 %, $\rho$ 0.45, $\sigma_\text{bonds}$ 5.5 %), which pushes equity $\mu$ below the grid's floor, still gives $k^*$ = `{python} k_stress` -- even there the answer is "lever a diversified book, just less."
+
+One caveat I owe the reader: $k^*$ is a whole-portfolio-Sharpe quantity, so it is not sensitive to those four alone. Perturbing the *held* inputs over plausible ranges -- gold correlations $\pm 0.15$, trend $\mu$ $\pm 1$ pp, trend $\sigma$ $\pm 2$ pp -- moves $k^*$ by up to ~`{python} frozen_max`, comparable to the equity-$\sigma$ axis. None of them leaves the `{python} k_lo`--`{python} k_hi` band, so the decision is unchanged, but that band is a lower bound on $k^*$ dispersion, not the whole of it.
+
+## Stage C -- the blend $\lambda$
+
+$\lambda$ is the trust dial: $\lambda = 0$ is the raw tangency ("I trust my $\mu$"), $\lambda = 1$ is pure ERC ("I trust only $\Sigma$", and $\mu$ drops out of the weights). @fig-lambda-sweep sweeps it.
+
+```{python}
+#| label: fig-lambda-sweep
+#| fig-cap: "Unlevered blend weights as λ moves from the raw tangency (0) to pure ERC (1). Raising λ lifts the diversifiers (trend, gold) and trims equity and bonds."
+import matplotlib.pyplot as plt
+import numpy as np
+
+sleeve_colors = {"equity": "#CC79A7", "bonds": "#0072B2", "trend": "#009E73", "gold": "#E69F00"}
+ls = sn.lambda_sweep(tuple(np.round(np.arange(0, 1.01, 0.1), 2)))
+
+fig, ax = plt.subplots(figsize=(8, 4))
+for sleeve in sn.SLEEVES:
+    ax.plot(ls["λ"], ls[f"{sleeve} weight"], color=sleeve_colors[sleeve], linewidth=2)
+    ax.annotate(
+        sleeve,
+        (1.0, ls[f"{sleeve} weight"].iloc[-1]),
+        textcoords="offset points",
+        xytext=(6, 0),
+        va="center",
+        color=sleeve_colors[sleeve],
+    )
+ax.set_xlim(0, 1.12)
+ax.set_ylim(0, None)
+ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
+ax.set_xlabel("λ  (0 = tangency, 1 = ERC)")
+ax.set_ylabel("Unlevered blend weight")
+ax.grid(True, axis="y", color="0.92")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+The lift comes at a Sharpe cost of `{python} sharpe_tan` → `{python} sharpe_erc`, while $k^*$ barely moves (`{python} k_tan` → `{python} k_erc`) -- so the blend is a bet on *composition*, not on *leverage*. What $\lambda$ actually buys is where the pre-committed expectation -- "raise $\lambda$ to cure $\mu$-fragility" -- only half survives the numbers, and the half that fails is the instructive one:
+
+```{python}
+#| label: tbl-lambda-band
+#| tbl-cap: "Stage C -- shape vs scale: how λ reshapes the input sensitivity. The bond-weight μ-range is the composition (shape); the k* ranges are the levered scale."
+wb = sn.weight_stability_by_lambda(MU_LEVELS).set_index("λ")
+kb = sn.band_by_lambda(MU_LEVELS, SIGMA_EQ_LEVELS, RHO_LEVELS).set_index("λ")
+lam_band = pd.concat([wb, kb], axis=1)
+lam_band = pd.DataFrame(
+    {
+        "bond weight μ-range (pp)": (lam_band.iloc[:, 0] * 100).map("{:.1f}".format),
+        "k* μ-range (×)": lam_band["μ-driven range"].map("{:.2f}".format),
+        "k* Σ-range (×)": lam_band["Σ-driven range"].map("{:.2f}".format),
+    }
+)
+lam_band.index = [f"{x:.1f}" for x in lam_band.index]
+lam_band.index.name = "λ"
+lam_band
+```
+
+$\lambda$ collapses the $\mu$-instability of the **weights** (the bond weight's $\mu$-driven swing falls from 16 pp to 0) -- that is precisely the ill-determination of @fig-tangency-instability, and raising $\lambda$ cures it. But it does **not** stabilize the levered **$k^*$** against $\mu$; that range *grows*. The reason is the same flat Sharpe peak: at the tangency, $\mu$ scatters the weights but leaves the realised Sharpe -- and thus $k^*$ -- near the peak, whereas pure ERC holds fixed weights, so $\mu$ passes straight through to the Sharpe and hence to $k^*$. $\lambda$ governs **shape**, not **scale**. And on the $\Sigma$ side $\lambda$ helps only marginally, so it cannot cure the bond-$\Sigma$ fragility Stage B flagged as dominant.
+
+## Stage D -- leverage $\gamma$
+
+$\gamma$ is swept in @tbl-leverage-gamma above. Leverage is a monotone post-scale on a fixed risky portfolio -- it scales gross exposure and the financing leg but does not reshape the risky weights -- so it is genuinely separable from B and C and needs no interaction sweep.
+
+## Reading it together
+
+Across the consensus ranges of the inputs the decision depends on -- including the bond volatility, the single largest lever -- $k^*$ stays in `{python} k_lo`--`{python} k_hi` (dipping to `{python} k_stress` only in the stress corner that reaches past the grid's floor), and the book stays gold-present with bonds the largest sleeve bar one extreme corner. The allocation is robust in both its leverage and its structure: "diversify, then lever" survives the ranges that matter, so I stop refining the inputs. The residual sensitivity that remains is to the **bond covariance inputs** ($\sigma_\text{bonds}$, then $\rho_\text{eq-bonds}$) -- not equity $\mu$ -- and the sweeps map each fragility to its remedy:
+
+- **$\mu$-fragility lives in the weights, and it is already handled** -- by the flat Sharpe peak (which keeps $k^*$ near-optimal despite the scattered weights) and by the $\lambda$ blend (which pins the weights). Hand-picking a friendlier $\mu$ is neither needed nor helpful.
+- **$\Sigma$-fragility (the bond sleeve) is dominant, and $\lambda$ does not touch it.** The right tools are the regime-justified $\sigma_\text{bonds}$ and $\rho$ overrides already in place, a practical bond cap, or a better $\Sigma$ estimate -- not a friendlier $\mu$.
+- **Even the stress corner keeps $k^* > 1$**, which is itself the reassuring, non-fragile conclusion: the bearish case still says lever a diversified book, just less.

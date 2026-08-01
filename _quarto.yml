@@ -42,6 +42,7 @@ format:
   html:
     theme: cosmo
     toc: true
+    toc-depth: 3
     toc-location: left
     number-sections: true
     code-fold: true

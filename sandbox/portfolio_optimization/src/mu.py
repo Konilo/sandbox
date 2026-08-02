@@ -26,7 +26,8 @@ VIEWS_REAL = {
     # assumption, built region by region (US ~2.9%, ex-US ~5.8%, cap-weighted).
     "equity": 0.0403,
     "bonds": 0.0120,  # WGBI-DM 4.08% local YTW - ~0.9pp EUR hedge - 2.0% inflation ~= 1.2% real
-    "trend": 0.0180,  # SG CTA Index live net-of-fee: 3.8% nominal-EUR CAGR - 2.0% inflation
+    "trend": 0.0270,  # forward: ~0.30 net Sharpe x ~9.5% strategy vol + ~0.19% real cash;
+    # between the gross ceiling (CFM/HOP 0.72-0.76) and the live SG-CTA floor (~0.13). Cayas CMA 2.7%.
     "gold": 0.0000,  # long-run real return = inflation (Ilmanen)
 }
 

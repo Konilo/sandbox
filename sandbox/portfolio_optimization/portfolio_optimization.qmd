@@ -330,6 +330,7 @@ The weights $w_\text{mkt}$ are the market capitalizations normalized to sum to o
 #| tbl-cap: "Market capitalizations, the implied market weights, and the equilibrium prior Π (real)."
 import black_litterman as bl
 from black_litterman import MARKET_CAPS, market_weights
+from mu import RF_REAL
 
 bl_prior = bl.equilibrium_prior(cov_final)
 bl_delta = bl.market_delta(cov_final)
@@ -337,6 +338,13 @@ bl_delta_fmt = f"{bl_delta:.1f}"
 cap_equity_fmt = f"{MARKET_CAPS['equity']:.0f}"
 cap_bonds_fmt = f"{MARKET_CAPS['bonds']:.0f}"
 cap_gold_fmt = f"{MARKET_CAPS['gold']:.0f}"
+trend_vol = cov_final.loc["trend", "trend"] ** 0.5
+trend_sharpe = 0.2  # forward net Sharpe assigned to the trend sleeve
+trend_sharpe_fmt = f"{trend_sharpe:.1f}"
+trend_vol_fmt = f"{trend_vol:.1%}"
+rf_real_fmt = f"{RF_REAL:.2%}"
+trend_excess_fmt = f"{trend_sharpe * trend_vol:.1%}"
+trend_return_fmt = f"{trend_sharpe * trend_vol + RF_REAL:.1%}"
 _caps = pd.Series(MARKET_CAPS).reindex(cov_final.index)
 pd.DataFrame(
     {
@@ -354,12 +362,12 @@ The market's risk aversion, $\delta$, is computed based on a set of professional
 
 ### My views
 
-Each sleeve's view is an estimate (partly inspired by Ilmanen's ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)) asset class-specific methods) fed to the Black-Litterman model with a confidence level in $[0, 1]$ representing my degree of trust in the estimate (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)):
+Each sleeve's view is an estimate (partly inspired by Ilmanen's ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)) asset class-specific methods) fed to the Black-Litterman model with a confidence level (between 0 and 1) representing my degree of trust in the estimate (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)):
 
 - **Bonds: ~1.2 % real, confidence 0.7.** DBZB's index, the FTSE World Government Bond Index - Developed Markets, yields 4.08 % to worst at 6.49 years effective duration ([FTSE](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026-07-26); hedging to EUR costs ~0.9 pp^[Hedging a foreign bond to EUR gives up the currency-weighted foreign-minus-EUR short-rate differential (covered interest parity). This 0.9 pp is napkin math: the index is ~40 % USD, where that differential is currently ~2 pp, partly offset by its lower-rate JPY sleeve. It shifts the real figure by only ~±0.2 pp.], leaving ~3.2 % hedged nominal; minus ~2 % expected inflation ([ECB](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.2 % real. The starting yield is a strong forward predictor of bond returns and the CAPM prior is a weak model for bonds, so I lean on the view.
-- **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at **4.03 %** (2026-06-30, [Elm Wealth](https://elmwealth.com/capital-market-assumptions/)). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
-- **Trend: ~1.8 % real, confidence 0.6.** No yield to anchor on, so we fallback to the historical mean: the SG CTA Index compounded 3.8 % nominal EUR over 2000-2026; minus ~2 % expected inflation gives ~1.8 % real. Lower confidence as this is only a backward-looking mean, but the momentum literature and my opinion increase that confidence.
-- **Gold: no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation according to Ilmanen), so I express nothing and leave gold at its equilibrium prior.
+- **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at **4.03 %** ([Elm Wealth](https://elmwealth.com/capital-market-assumptions/), 2026-07-27). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
+- **Trend: ~2.7 % real, confidence 0.65.** A lot of evidence backs the trend premium. It was positive over every decade since 1800 (Lempérière et al., [2014](https://doi.org/10.21314/JOIS.2014.043)), a diversified time-series-momentum Sharpe above 1 since 1966 (Moskowitz, Ooi & Pedersen, [2012](https://doi.org/10.1016/j.jfineco.2011.11.003)), and robust across a century net of fees (Hurst, Ooi & Pedersen, [2017](https://doi.org/10.3905/jpm.2017.44.1.015)). Its existence is well-established; its magnitude is not, though. Those studies' gross Sharpes of 0.7 to >1 come from stronger, less-crowded pre-2000 trends, while the live net-of-fee SG CTA Index I would track via DBMFE had a Sharpe of only ~0.13 over our sample period. I place my view between those bounds. The EUR-unhedged SG CTA that DBMFE benchmarks carries a ~`{python} trend_vol_fmt` volatility; I assign it a forward net Sharpe of `{python} trend_sharpe_fmt`. Its excess real return is then `{python} trend_sharpe_fmt` × `{python} trend_vol_fmt` ≈ `{python} trend_excess_fmt`, and adding the `{python} rf_real_fmt` real cash rate (cf. @sec-leverage) gives `{python} trend_return_fmt` real. The confidence is set below the ones of equity and bonds, and above what a noisy estimate would get, because the CAPM equilibrium prior is structurally unfit here: trend is an anomaly a single-factor model cannot price correctly which penalizes managed futures given their low beta.
+- **Gold: no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation according to Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198))), so I express nothing and leave gold at its equilibrium prior.
 
 
 ### The posterior
@@ -385,7 +393,7 @@ for _a in cov_final.index:
 pd.DataFrame(_rows).T.rename_axis("sleeve").reset_index().style.hide(axis="index")
 ```
 
-This posterior is the MVO input. The posterior equity return is not far from my view; bonds also are only modestly shrunk; trend is pulled part-way down from 1.8 % toward its near-zero prior; and gold sits at its prior, equilibrium value.
+This posterior is the MVO input. The posterior equity return is not far from my view; bonds also are only modestly shrunk; trend is pulled part-way down from 2.7 % toward its near-zero prior; and gold sits at its prior, equilibrium value.
 
 
 # Determining the portfolio weights
@@ -394,7 +402,7 @@ MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, 
 
 ```{python}
 #| label: tbl-tangency
-#| tbl-cap: "The tangency portfolio: max-Sharpe of the BL posterior on the study covariance (real, financed at $R_F$ = 0.19 %)."
+#| tbl-cap: "The tangency portfolio: max-Sharpe of the Black-Litterman model's posterior returns and of the covariance matrix (real, financed at $R_F$ = 0.19 %)."
 from composition import portfolio_performance, tangency_weights
 
 w_risky = tangency_weights(cov_final, bl_post)
@@ -412,7 +420,7 @@ pd.DataFrame([_row]).style.hide(axis="index")
 Equity and bonds anchor the book at ~`{python} w_equity_fmt` and ~`{python} w_bonds_fmt`, respectively, with trend (~`{python} w_trend_fmt`) and gold (~`{python} w_gold_fmt`) as the diversifiers.
 
 
-# Applying leverage
+# Applying leverage {#sec-leverage}
 
 The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), reference 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the tangency portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
 

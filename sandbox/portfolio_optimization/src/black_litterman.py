@@ -28,15 +28,16 @@ forward ~4.5-5%, Damodaran implied 4.23%, Kroll 5.0%, Fernandez-2026 survey
 5.5% -> ~5.0%. This gives delta ~= 3.6.
 
 Views (absolute, real) are Konilo's honest from-source estimates (mu.VIEWS_REAL):
-equity 4.03% (Elm P-CAEY), bonds 1.20% (WGBI-DM yield), trend 1.80% (SG CTA).
+equity 4.03% (Elm P-CAEY), bonds 1.20% (WGBI-DM yield), trend 2.70% (forward).
 Gold gets NO view (no forward anchor) -> it stays at its equilibrium prior.
 Per-view Idzorek confidences reflect each view's reliability vs the prior:
   equity 0.8  P-CAEY forward/valuation-aware; the prior is valuation-blind and
               higher, so trust the view (Cayas corroborates a low equity ~3.5%).
   bonds  0.7  the starting yield is a strong forward predictor; the CAPM prior is
               a weak model for bonds; Cayas 1.3% ~= the view, not the prior.
-  trend  0.6  noisier estimate (backward mean), but momentum evidence + Cayas
-              (2.7%, more bullish) support keeping the sleeve meaningful.
+  trend  0.65 forward view (not a backward mean); the CAPM prior is structurally
+              unfit for a ~0-beta anomaly, and the premium's existence is the
+              best-evidenced in the set, so lean on the view. Cayas 2.7% agrees.
 """
 
 from __future__ import annotations
@@ -52,7 +53,7 @@ MARKET_CAPS = {"equity": 101.47, "bonds": 30.54, "gold": 15.40}  # USD tn; trend
 EQUITY_ERP = 0.050  # external, arithmetic, over bills, world (see docstring)
 
 VIEW_ASSETS = ("equity", "bonds", "trend")  # gold intentionally has no view
-VIEW_CONFIDENCES = {"equity": 0.8, "bonds": 0.7, "trend": 0.6}  # Idzorek
+VIEW_CONFIDENCES = {"equity": 0.8, "bonds": 0.7, "trend": 0.65}  # Idzorek
 TAU = 0.05
 
 

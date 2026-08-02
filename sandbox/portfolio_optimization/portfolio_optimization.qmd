@@ -10,9 +10,7 @@ jupyter: python3
 
 # Introduction
 
-I want to determine a humbly-optimized strategy for my long-term investment portfolio.
-
-My goal is to maximize the [utility](https://en.wikipedia.org/wiki/Utility) I will derive from this portfolio. Assuming constant relative risk aversion and a utility function of following form, as per [Merton's portfolio problem](https://en.wikipedia.org/wiki/Merton's_portfolio_problem):
+I want to determine a humbly-optimized strategy for my long-term investment portfolio. My goal is to maximize the [utility](https://en.wikipedia.org/wiki/Utility) I will derive from this portfolio. Assuming constant relative risk aversion and a utility function of the following form, as per [Merton's portfolio problem](https://en.wikipedia.org/wiki/Merton's_portfolio_problem):
 
 $$
 u(x) = \frac{x^{1-\gamma}}{1-\gamma}
@@ -30,7 +28,7 @@ I estimated that, personnally, $\gamma = 2$. This estimation is out of the scope
 
 ```{python}
 #| label: fig-crra-utility
-#| fig-cap: "CRRA utility of consumed wealth, for my $\\gamma = 2$ and two other risk aversion levels, for comparison. (Utility is ordinal -- only the curvature and the comparison of values are meaningful, not the values alone.)"
+#| fig-cap: "CRRA utility of consumed wealth, for my $\\gamma = 2$ and two other risk aversion levels, for comparison. (Utility is ordinal, only the shape of the curve is meaningful, not the absolute values. And values cannot be compared across distinct functions like the three above.)"
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -79,43 +77,54 @@ Analytical process:
 To summarize, the challenge is to estimate the portfolio of assets that will maximize the expected return per unit of risk taken, and then leverage it to the level of risk that best suits my psychology (@eq-challenge).
 
 $$
-\underbrace{\frac{\text{return}}{\text{risk}}}_{\text{to maximize}} \times \underbrace{\text{leverage}}_{\text{to adapt to my risk aversion level}}
+\underbrace{\frac{\text{return}}{\text{risk}}}_{\text{to maximize}} \times \underbrace{\text{leverage}}_{\substack{\text{to adapt to my} \\ \text{risk aversion level}}}
 $$ {#eq-challenge}
 
 
 # Historical returns
 
-Historical returns are important, but not sufficient, factors in the determination of the optimizer's inputs. They are estimated from long-history proxies for the actual ETFs I would invest in because those ETFs are too recent. Return time series are monthly and denominated in EUR.
+Historical returns are important, but not sufficient, factors in the determination of the MVO inputs. They are estimated from long-history proxies of the actual ETFs I would invest in because those ETFs are too recent. Return time series are monthly and denominated in EUR.
 
 | Sleeve | Proxy | Currency handling | Native time range | Source |
 |---|---|---|---|---|
-| Equity | MSCI World Standard (Large+Mid), Net | EUR (native) | 2001-01 to 2026-06 | [MSCI](https://app2.msci.com/products/index-data-search/regional_chart.jsp?asOf=24/Jul/2026&size=Standard%20(Large%2BMid%20Cap)&scope=R&style=None&currency=EUR&priceLevel=NETR&indexId=990100&indexName=WORLD&suite=C) |
+| Equity | MSCI ACWI Standard (Large+Mid), Net | EUR (native) | 2001-01 to 2026-06 | [MSCI](https://app2.msci.com/products/index-data-search/regional_chart.jsp?asOf=24/Jul/2026&size=Standard%20(Large%2BMid%20Cap)&scope=R&style=None&currency=EUR&priceLevel=NETR&indexId=892400&indexName=ACWI&suite=C) |
 | Bonds | FTSE WGBI Developed, EUR-hedged | EUR-hedged (native) | 1985-02 to 2026-04 | [Curvo](https://curvo.eu/backtest/en/market-index/ftse-world-government-bond-developed-markets-hedged-eur?currency=eur) |
 | Trend | SG CTA Index, net-of-fee | USD (native) converted to EUR, unhedged | 2000-01 to 2026-07 | [SG Prime Services](https://wholesale.banking.societegenerale.com/en/prime-services-indices/) (index), [Curvo](https://curvo.eu/backtest/data/eur-usd.json) (EUR/USD) |
 | Gold | LBMA PM gold fix | EUR (native) | 1999-02 to 2026-07 | [LBMA](https://prices.lbma.org.uk/json/gold_pm.json) |
 : Return time series used as proxies for the study {#tbl-data}
-
-The SG CTA Index is the live, net-of-fee return of a [pool of the largest managed-futures CTAs](https://wholesale.banking.societegenerale.com/fileadmin/indices_feeds/SG_CTA_Index_Constituents.pdf). It is a good proxy for DBMFE (which uses it as its benchmark). DBMFE is an unhedged, EUR-denominated share class, so I simply convert the USD index to EUR and leave it unhedged.
-
-The resulting cross-sectionally-complete time frame is 2001-01 to 2026-04 (~25 years, 304 months). It spans the bear market that followed the dot-com bubble, the GFC, the Covid crisis, and the 2022 stock–bond correlation sign flip.
 
 ```{python}
 #| label: setup
 #| include: false
 import sys
 
+import numpy as np
+import pandas as pd
+
 # The study's Python modules live in src/.
 sys.path.insert(0, "src")
-```
-
-```{python}
-#| label: tbl-data-summary
-import pandas as pd
 
 from data import monthly_returns_matrix
 
+
+def mask_upper(matrix):
+    """Blank the strictly-upper-triangular cells for displaying a symmetric matrix."""
+    keep = np.tril(np.ones(matrix.shape, dtype=bool))
+    return matrix.where(keep, "")
+
+
 returns = monthly_returns_matrix()
+
+# Study window and size, surfaced in the prose below.
+data_start = f"{returns.index.min():%Y-%m}"
+data_end = f"{returns.index.max():%Y-%m}"
+n_months = len(returns)
+n_years = round(n_months / 12)
 ```
+
+The SG CTA Index is the live, net-of-fee return of a [pool of the largest managed-futures CTAs](https://wholesale.banking.societegenerale.com/fileadmin/indices_feeds/SG_CTA_Index_Constituents.pdf). It is a good proxy for DBMFE (which uses it as its benchmark). DBMFE is an unhedged, EUR-denominated share class, so I simply convert the USD index to EUR and leave it unhedged.
+
+The resulting cross-sectionally-complete time frame is `{python} data_start` to `{python} data_end` (~`{python} n_years` years, `{python} n_months` months). It spans the bear market that followed the dot-com bubble, the GFC, the Covid crisis, and the 2022 stock–bond correlation sign flip.
 
 @tbl-data-vol shows the annualized volatilities of each sleeve.
 ```{python}
@@ -128,7 +137,7 @@ The numbers above are full-period averages that hide large regime shifts, most s
 
 ```{python}
 #| label: fig-rolling-vol
-#| fig-cap: "36-month rolling annualized volatility of each sleeve."
+#| fig-cap: "36-month rolling annualized volatility of each sleeve's proxy."
 import matplotlib.pyplot as plt
 
 from matplotlib.ticker import PercentFormatter
@@ -151,20 +160,16 @@ ax.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-@tbl-data-corr shows the correlations between each pair of sleeves during the time period under study. As for volatilities, those single unmbers hide the regime changes that occured during the period. We will come back to that.
+@tbl-data-corr shows the correlations between each pair of sleeve proxy during the time period under study. As for volatilities, those single numbers hide the regime changes that occured during the period. We will come back to that.
 ```{python}
 #| label: tbl-data-corr
 #| tbl-cap: "Correlation matrix of the sleeves' historical returns."
-returns.corr().round(2)
+mask_upper(returns.corr().map("{:.2f}".format))
 ```
 
 
 # Computing the inputs of the mean-variance optimizer
 ## Covariance matrix
-
-The first input we will tackle is the covariance matrix.
-
-
 ### Historical covariances & Ledoit-Wolf shrinkage
 
 ```{python}
@@ -180,24 +185,30 @@ lw_delta_fmt = f"{delta:.2f}"
 sample_corr = returns.corr()
 off_diagonal = ~np.eye(len(sample_corr), dtype=bool)
 avg_corr_fmt = f"{sample_corr.values[off_diagonal].mean():.2f}"
+
+bond_sample_vol_fmt = f"{returns['bonds'].std() * 12**0.5:.1%}"
 ```
 
-The sample of historical returns allow us to compute a covariance matrix. But, as per Ledoit & Wolf, [2003](http://www.ledoit.net/honey.pdf), "obody should be using the sample
-covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} lw_delta_fmt` by the Ledoit-Wolf estimator. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage). The problem targetted by Ledit & Wolf is most important in cases where the number of assets surpasses the number of observations in each returns time series which is far from our case, by we apply that method for robustness.
+The sample of historical returns allow us to compute a covariance matrix. But, as per Ledoit & Wolf ([2003](http://www.ledoit.net/honey.pdf)), "nobody should be using the sample
+covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} lw_delta_fmt` by the Ledoit-Wolf estimator. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage). The problem targetted by Ledit & Wolf is most important in cases where the number of assets surpasses the number of observations in each return time series which is far from our case, but I apply that method for robustness.
 
 ```{python}
 #| label: tbl-shrinkage
-#| tbl-cap: "Ledoit-Wolf-shrunk covariance matrix."
-correlation(cov_lw).round(2)
+#| tbl-cap: "Ledoit-Wolf-shrunk correlations; each off-diagonal cell shows the shrunk value, with the shift from the sample correlation in parentheses."
+_shrunk = correlation(cov_lw)
+_shift = _shrunk - returns.corr()
+_cells = _shrunk.copy().astype(object)
+for _i in _shrunk.index:
+    for _j in _shrunk.columns:
+        _cells.loc[_i, _j] = (
+            "1.00"
+            if _i == _j
+            else f"{_shrunk.loc[_i, _j]:.2f} ({round(_shift.loc[_i, _j], 2) + 0.0:+.2f})"
+        )
+mask_upper(_cells)
 ```
 
-@tbl-shrinkage-shift shows how much the shrinkage moved each correlation (shrunk - sample) toward the `{python} avg_corr_fmt` average.
-
-```{python}
-#| label: tbl-shrinkage-shift
-#| tbl-cap: "Shifts caused by the Ledoit-Wolf shrinkage over the covariance matrix."
-(correlation(cov_lw) - returns.corr()).round(3)
-```
+The shifts shown in parentheses in @tbl-shrinkage are small, confirming that the pull toward the `{python} avg_corr_fmt` average of the off-diagonal sample correlations is mild.
 
 
 ### Regime inspection
@@ -205,23 +216,35 @@ correlation(cov_lw).round(2)
 The correlations above -- sample or shrunk -- are full-period averages.
 They hide the evolution of the degree of comovement over time between the sleeves. The optimizer relies on covariances to find the best combination of assets (diversification) and maximize risk-adjusted returns.
 To be more specific, I want equities to be un- or anticorrelated relative to the other sleeves when equities crash. A negative average correlation doesn't provide enough time granularity to examine this.
-So it is important that we scrutinize those single numbers before feeding them to MVO. In @tbl-regime-corr, I bucket the 304 months by the sign of the equity return and compute each sleeve's correlation with equity within each bucket.
+So it is important that we scrutinize those single numbers before feeding them to MVO. In @tbl-regime-corr, I bucket the `{python} n_months` months by the sign of the equity return and compute each sleeve's correlation with equity within each bucket.
 
 ```{python}
 #| label: tbl-regime-corr
 #| tbl-cap: "Correlation with equity by equity-state bucket."
 from regimes import conditional_correlations
 
-conditional_correlations(returns).round(2)
+cc = conditional_correlations(returns)
+bonds_worst_fmt = f"{cc.loc['equity worst quartile', 'bonds']:.2f}"
+trend_up_fmt = f"{cc.loc['equity up', 'trend']:.2f}"
+trend_down_fmt = f"{cc.loc['equity down', 'trend']:.2f}"
+trend_worst_fmt = f"{cc.loc['equity worst quartile', 'trend']:.2f}"
+gold_worst_fmt = f"{cc.loc['equity worst quartile', 'gold']:.2f}"
+
+(
+    cc.rename_axis("equity state")
+    .reset_index()
+    .style.hide(axis="index")
+    .format(precision=2)
+)
 ```
 
 @tbl-regime-corr tells a different story than the average:
 
-- Bonds have been a risk-off hedge: increasingly negatively-correlated as equity weakens (down to -0.17 in the worst quartile).
-- Trend acted as a convex hedge: mildly positively-correlated with equity when equity rises (0.13), but turning slightly negative when equity falls (-0.06 to -0.09).
-- Gold acted as a tail hedge: roughly uncorrelated when equity rises or falls modestly, but negative (-0.17) in the worst quartile.
+- Bonds have been a risk-off hedge: increasingly negatively-correlated as equity weakens (down to `{python} bonds_worst_fmt` in the worst quartile).
+- Trend acted as a convex hedge: mildly positively-correlated with equity when equity rises (`{python} trend_up_fmt`), but turning slightly negative when equity falls (`{python} trend_down_fmt` to `{python} trend_worst_fmt`).
+- Gold acted as a tail hedge: roughly uncorrelated when equity rises or falls modestly, but negative (`{python} gold_worst_fmt`) in the worst quartile.
 
-The buckets in @tbl-regime-corr are static -- they pool months regardless of when they occured. @fig-rolling-corr instead shows how equity correlated with the other sleeves over the period, on a 36-month rolling window.
+The buckets in @tbl-regime-corr are static -- they pool months regardless of when they occured. @fig-rolling-corr instead shows how equity correlated with the other sleeves over time.
 
 ```{python}
 #| label: fig-rolling-corr
@@ -245,23 +268,22 @@ ax.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-@fig-rolling-corr makes the instability even clearer.
+@fig-rolling-corr provides new insights:
 
 - As the [headlines](https://www.aqr.com/Insights/Perspectives/A-Positive-Stock-Bond-Correlation-Is-a-Terrible-Reason-to-Add-More-Equity-Risk-to-Your-Portfolio) said, the stock-bond correlation turned positive. It was negative for most of the period, but flipped sign around 2022 and reached a peak (in our sample) at +0.71 in 2025. The risk-off hedge of the 2000s and 2010s has, for now, become a risk-on co-mover.
-- Trend's correlation to stocks swings widely (from +0.77 in 2006 to -0.33 in 2024), consistent with its convex, regime-dependent profile.
-- And gold's was most stable (-0.34 to +0.37) albeit rarely substantially anticorrelated.
+- Trend's correlation to stocks swings widely (from +0.76 in 2006 to -0.35 in 2024), consistent with its convex, regime-dependent profile.
+- And gold's was most stable (-0.33 to +0.39) albeit rarely substantially anticorrelated.
 
 
 ### Cautious overrides
 
-The regime inspection makes me distrust one correlation (even shrunk): the equity-bonds one. Its 25-year average is roughly zero, but it flipped positive in 2022, peaked near 0.7 in 2025, and is still elevated (~0.5) at the sample end (@fig-rolling-corr). Feeding the optimizer a diversifying ~0 would let it lean on a bond hedge that I don't trust going forward. So I override it to a conservative 0.25 -- above the historical average, below the current regime -- and leave the other five correlations at their shrunk levels.
+The regime inspection makes me distrust one correlation (even shrunk): the equity-bonds one. Its 25-year average is roughly zero, but it flipped positive in 2022, peaked near 0.7 in 2025, and is still elevated (~0.5) at the sample end (@fig-rolling-corr). Feeding MVO a ~0 would let it lean on a bond hedge that I don't trust going forward. So I override it to a more conservative 0.25 -- above the historical average, below the current regime -- and leave the other five correlations at their shrunk levels.
 
-I distrust bonds historical volatility for the same reason. Its 3.8 % sample figure leans on the structurally calm ZIRP/QE decades (2001-2019 ran ~3.0-3.1 %), but the post-2020 volatility regime has run at or above 5 %, the 36-month rolling vol now sits near 5.0 % (@fig-rolling-vol), and the ETF's own 3-year factsheet standard deviation is 4.48 % ([IGLE factsheet, iShares](https://www.ishares.com/uk/individual/en/products/310297/ishares-global-govt-bond-ucits-etf-eur-hedged-dist-fund)). So I raise it to 5 %. (This is a load-bearing input for the bond weight givne by MVO: the tangency's bond weight falls from ~68 % to ~53 % and equity doubles.)
+I distrust bonds historical volatility for the same reason. Its `{python} bond_sample_vol_fmt` sample figure leans on the structurally calm ZIRP/QE decades (2001-2019 ran ~3.0-3.1 %), but the post-2020 volatility regime has run at or above 5 %, the 36-month rolling vol now sits at about 5.0 % (@fig-rolling-vol). So I raise it to 5 %.
 
-The non-equity sleeves' crisis-hedging value, which a single matrix cannot see, is not preserved here by editing the correlations. Instead, it will be handled downstream by the risk-parity anchor.
+The non-equity sleeves' crisis-hedging value is convex and state-dependent, which is an information a single covariance matrix cannot convey. Editing the correlations cannot capture it. MVO prices these sleeves on their average comovement, so it under-weights the tail protection they offer. This is a known limitation of any single-covariance optimizer, which I accept.
 
-
-@tbl-final-corr & @tbl-final-vol show the correlations & volatilities MVO will be fed.
+What MVO is fed is the covariance matrix $\Sigma$: its diagonal holds the sleeve variances (the volatilities squared) and its off-diagonal entries are $\Sigma_{ij} = \sigma_i\,\sigma_j\,\rho_{ij}$. @tbl-final-corr and @tbl-final-vol decompose it into correlations and volatilities for legibility.
 
 ```{python}
 #| label: tbl-final-corr
@@ -271,59 +293,78 @@ from covariance import annualized_vols, final_covariance
 rho_equity_bonds = 0.25
 sigma_bonds = 0.05
 cov_final = final_covariance(returns, rho_equity_bonds=rho_equity_bonds, sigma_bonds=sigma_bonds)
-correlation(cov_final).round(2)
+mask_upper(correlation(cov_final).map("{:.2f}".format))
 ```
 
 ```{python}
 #| label: tbl-final-vol
 #| tbl-cap: "Final annualized volatilities (bond vol overridden to 5%)."
-pd.DataFrame({"annualized vol": annualized_vols(cov_final).map("{:.1%}".format)})
+(
+    pd.DataFrame({"annualized vol": annualized_vols(cov_final).map("{:.1%}".format)})
+    .rename_axis("sleeve")
+    .reset_index()
+    .style.hide(axis="index")
+)
 ```
 
 
 ## Expected returns
 
-The optimizer's second input is the expected-return vector -- the least reliable MVO input, and the one that most wrecks the weights when it is off. So rather than feed it my own point estimates directly, I pass them through a [Black-Litterman](https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model) model: start from the return the *market* implies (the equilibrium prior), then tilt toward each of my views only as far as my confidence in it warrants. That shrinkage toward the market *is* the humility mechanism -- a mistaken or over-confident view is pulled back toward the market, not taken at face value.
+The second MVO input is the vector of expected returns -- the least reliable estimates, and one of the inputs MVO is most sensitive to. So, rather than feeding my own point estimates directly, I pass them through a Black-Litterman model (He & Litterman, [2002](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=334304); [Wikipedia](https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model)): it starts with the market-implied returns (more on that below), considered as a reasonable anchor (playing the role of a Bayesian prior), and tilts them toward my personal views using a given confidence level I also provide.
+
 
 ### The equilibrium prior
 
-Reverse optimization recovers the market's own expectations: if investors hold the cap-weighted portfolio $w_\text{mkt}$, and hold it optimally under a risk aversion $\delta$, the returns they must expect are $\Pi = \delta\,\Sigma\,w_\text{mkt}$. The weights come from market capitalizations (all in USD -- only the ratios enter):
+The market-implied return is the equilibrium return of the Capital Asset Pricing Model (CAPM; Sharpe, [1964](https://doi.org/10.1111/j.1540-6261.1964.tb02865.x)), recovered by reverse optimization. A mean-variance investor with risk-aversion coefficient $\delta$ ($\lambda$ in Idzorek's notation) chooses risky-asset weights $w$ to maximize the quadratic utility $U(w) = w'\Pi - \tfrac{\delta}{2}\,w'\Sigma w$, where $\Pi$ is the vector of expected excess returns over the risk-free rate and $\Sigma$ their covariance matrix. Its first-order condition, $\Pi - \delta\Sigma w = 0$, gives the optimal weights $w = \tfrac{1}{\delta}\Sigma^{-1}\Pi$ (Markowitz, [1952](https://doi.org/10.1111/j.1540-6261.1952.tb01525.x)). Reverse optimization inverts this relation: taking the capitalization-weighted market portfolio $w_\text{mkt}$ as optimal, the excess returns that justify holding it are
+
+$$
+\Pi = \delta\,\Sigma\,w_\text{mkt}
+$$
+
+the implied equilibrium returns (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)), where $w_\text{mkt}$ is the vector of market-capitalization weights. Adding the risk-free rate gives the expected return reported in @tbl-bl-prior.
+
+The weights $w_\text{mkt}$ are the market capitalizations normalized to sum to one, which treats the four sleeves as the whole market. They are not -- credit, real estate, cash and many other assets are excluded -- but computing the equilibrium over the investable universe rather than a literally global market portfolio is the standard Black-Litterman construction, in which the market is the set of assets under consideration (He & Litterman, [1999](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=334304); Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)). The prior is thus the CAPM-implied return within that universe. @tbl-bl-prior shows the capitalizations (in USD for data availability; only the ratios matter, so the currency is irrelevant), the implied weights, and the prior:
 
 ```{python}
 #| label: tbl-bl-prior
-#| tbl-cap: "Market caps, the implied market weights, and the equilibrium prior Π (real)."
+#| tbl-cap: "Market capitalizations, the implied market weights, and the equilibrium prior Π (real)."
 import black_litterman as bl
 from black_litterman import MARKET_CAPS, market_weights
 
 bl_prior = bl.equilibrium_prior(cov_final)
 bl_delta = bl.market_delta(cov_final)
 bl_delta_fmt = f"{bl_delta:.1f}"
+cap_equity_fmt = f"{MARKET_CAPS['equity']:.0f}"
+cap_bonds_fmt = f"{MARKET_CAPS['bonds']:.0f}"
+cap_gold_fmt = f"{MARKET_CAPS['gold']:.0f}"
 _caps = pd.Series(MARKET_CAPS).reindex(cov_final.index)
 pd.DataFrame(
     {
-        "cap (USD tn)": _caps.map(lambda x: "--" if pd.isna(x) else f"{x:,.1f}"),
+        "capitalization (USD trillion)": _caps.map(lambda x: "--" if pd.isna(x) else f"{x:,.1f}"),
         "market weight": market_weights(cov_final.index).map("{:.1%}".format),
         "prior Π": bl_prior.map("{:.2%}".format),
     }
-)
+).rename_axis("sleeve").reset_index().style.hide(axis="index")
 ```
 
-The caps are the MSCI ACWI free-float market cap (equity, \$101 tn), the FTSE WGBI-Developed index *market value* (bonds, \$31 tn) and WGC financial gold (\$15 tn), each from its 2026 factsheet. Managed futures is a **zero-net-supply** strategy with no market capitalization, so it takes weight $0$ in the market portfolio; its prior then falls out of the reverse-opt as $\beta_\text{MF}\times\text{premium}\approx 0$ (near-zero because it is near-zero-beta), and its return enters entirely as a view.
+The capitalizations are the MSCI ACWI free-float market cap (\$`{python} cap_equity_fmt` tn, [MSCI factsheet](https://www.msci.com/documents/10199/255599/msci-acwi-net.pdf), 2026), the FTSE WGBI-Developed index market value (\$`{python} cap_bonds_fmt` tn, [FTSE factsheet](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026), and WGC financial gold (\$`{python} cap_gold_fmt` tn, [WGC](https://www.gold.org/goldhub/research/market-primer/gold-market-primer-market-size-and-structure), 2026). Managed futures don't have a market capitalization, so they take weight $0$ in the market portfolio. Their equilibrium prior is still not exactly zero, though: the market-implied return depends on each asset's covariance with the market (its $\beta$) rather than on its own weight, and managed futures' low $\beta$ puts them at near-zero prior. Their return therefore comes almost entirely from the view.
 
-$\delta$, the market's risk aversion, I derive from an **independent** external equity risk premium -- deliberately *not* from my own views, which would make the prior a circular mirror of them. An arithmetic, over-bills, world equity premium triangulated across the [DMS/UBS 2026 Yearbook](https://www.ubs.com/content/dam/assets/wm/static/cio/documents/giry2026-summary-public.pdf), [Damodaran](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histimpl.html) (implied US 4.23 %), [Kroll](https://www.kroll.com/en/reports/cost-of-capital/recommended-us-equity-risk-premium-and-corresponding-risk-free-rates) (5.0 %) and the [Fernandez 2026 survey](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6570342) (5.5 %) lands at ~5.0 %; blended to a market-portfolio premium (bond term premium ~1 %, gold ~0) and divided by $\sigma^2_\text{mkt} = w_\text{mkt}'\Sigma\,w_\text{mkt}$, this gives $\delta \approx$ `{python} bl_delta_fmt`. $\delta$ scales the prior's level -- and, downstream, the leverage -- but not its composition.
+The market's risk aversion, $\delta$, is computed based on a set of professional equity risk premium assumptions: I set $\delta$ so that the market-implied return on equity equals that premium, $\delta = \text{ERP} / \operatorname{cov}(\text{equity}, \text{market})$, and every other sleeve's implied return then follows from its covariance with the market -- no separate bond or gold premium is assumed. Equity is ~69 % of the market and the only sleeve with a well-identified premium, so anchoring $\delta$ to it keeps every input sourced. The premium is an external number, not my own equity view (which would make the prior a mirror of it): an arithmetic, over-bills, world equity premium triangulated across the [DMS/UBS 2026 Yearbook](https://www.ubs.com/content/dam/assets/wm/static/cio/documents/giry2026-summary-public.pdf), [Damodaran](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histimpl.html) (implied US 4.23 %), [Kroll](https://www.kroll.com/en/reports/cost-of-capital/recommended-us-equity-risk-premium-and-corresponding-risk-free-rates) (5.0 %) and the [Fernandez 2026 survey](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6570342) (5.5 %) lands at ~5.0 %. This gives $\delta \approx$ `{python} bl_delta_fmt`. $\delta$ scales the prior's level (and, downstream, the leverage) but not its weights.
+
 
 ### My views
 
-Each sleeve's view is an honest from-source estimate (Ilmanen's per-asset method), carried into BL with an Idzorek confidence in $[0, 1]$ set by how far I trust it against the prior:
+Each sleeve's view is an estimate (partly inspired by Ilmanen's ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)) asset class-specific methods) fed to the Black-Litterman model with a confidence level in $[0, 1]$ representing my degree of trust in the estimate (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)):
 
-- **Bonds -- ~1.2 % real, confidence 0.7.** DBZB's index, the FTSE World Government Bond Index - Developed Markets, yields 4.08 % to worst at 6.49 years effective duration ([FTSE](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026-07-26); hedging to EUR costs ~0.9 pp^[Hedging a foreign bond to EUR gives up the currency-weighted foreign-minus-EUR short-rate differential (covered interest parity). This 0.9 pp is napkin math: the index is ~40 % USD, where that differential is currently ~2 pp, partly offset by its lower-rate JPY sleeve. It shifts the real figure by only ~±0.2 pp.], leaving ~3.2 % hedged nominal; minus ~2 % expected inflation ([ECB](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.2 % real. The starting yield is a strong forward predictor of bond returns and the CAPM prior is a weak model for bonds, so I lean on the view.
-- **Equity -- 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at **4.03 %** (2026-06-30, [Elm Wealth](https://elmwealth.com/capital-market-assumptions/)). Held firmly: it is forward and valuation-aware, whereas the prior is valuation-blind and higher.
-- **Trend -- ~1.8 % real, confidence 0.6.** No yield to anchor on, so the historical mean of the live proxy (Ilmanen's fallback): the SG CTA Index compounded 3.8 % nominal EUR over 2000-2026; minus ~2 % expected inflation gives ~1.8 % real. Lower confidence -- a backward-looking mean with no forward anchor -- but the momentum literature and independent estimates keep the sleeve meaningful.
-- **Gold -- no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation), so I express nothing and leave gold at its equilibrium prior.
+- **Bonds: ~1.2 % real, confidence 0.7.** DBZB's index, the FTSE World Government Bond Index - Developed Markets, yields 4.08 % to worst at 6.49 years effective duration ([FTSE](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026-07-26); hedging to EUR costs ~0.9 pp^[Hedging a foreign bond to EUR gives up the currency-weighted foreign-minus-EUR short-rate differential (covered interest parity). This 0.9 pp is napkin math: the index is ~40 % USD, where that differential is currently ~2 pp, partly offset by its lower-rate JPY sleeve. It shifts the real figure by only ~±0.2 pp.], leaving ~3.2 % hedged nominal; minus ~2 % expected inflation ([ECB](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.2 % real. The starting yield is a strong forward predictor of bond returns and the CAPM prior is a weak model for bonds, so I lean on the view.
+- **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at **4.03 %** (2026-06-30, [Elm Wealth](https://elmwealth.com/capital-market-assumptions/)). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
+- **Trend: ~1.8 % real, confidence 0.6.** No yield to anchor on, so we fallback to the historical mean: the SG CTA Index compounded 3.8 % nominal EUR over 2000-2026; minus ~2 % expected inflation gives ~1.8 % real. Lower confidence as this is only a backward-looking mean, but the momentum literature and my opinion increase that confidence.
+- **Gold: no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation according to Ilmanen), so I express nothing and leave gold at its equilibrium prior.
+
 
 ### The posterior
 
-Black-Litterman blends each view with the prior in inverse proportion to their uncertainties (Idzorek's confidence method, $\tau = 0.05$):
+The Black-Litterman model blends each view with the prior in inverse proportion to their uncertainties (Idzorek's confidence method, $\tau = 0.05$^[$\tau$ scales the prior's uncertainty level. A small $\tau$ makes the prior harder to depart from. 0.05 is the conventional value.]):
 
 ```{python}
 #| label: tbl-bl-posterior
@@ -341,36 +382,39 @@ for _a in cov_final.index:
         "confidence": f"{VIEW_CONFIDENCES[_a]:.1f}" if _has_view else "--",
         "posterior μ": f"{bl_post[_a]:.2%}",
     }
-pd.DataFrame(_rows).T
+pd.DataFrame(_rows).T.rename_axis("sleeve").reset_index().style.hide(axis="index")
 ```
 
-This posterior is the MVO input. Equity stays near my view (my 0.8 confidence in a valuation-aware number disciplines the market's higher prior); bonds are shrunk only modestly (0.7 confidence holds the yield-based view well above the CAPM prior); trend is pulled part-way down from 1.8 % toward its near-zero prior; and gold, viewless, sits at its equilibrium value.
+This posterior is the MVO input. The posterior equity return is not far from my view; bonds also are only modestly shrunk; trend is pulled part-way down from 1.8 % toward its near-zero prior; and gold sits at its prior, equilibrium value.
 
 
 # Determining the portfolio weights
 
-With the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, the risky portfolio is their max-Sharpe -- the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio). Mutual-fund separation then applies: since short box spreads lend at ~the risk-free rate, every investor holds this same risky book and scales it by leverage to their own risk appetite (the next section; remember @eq-challenge?). Black-Litterman has already done the humbling -- the posterior is shrunk toward the market -- so I take the tangency directly, with no further shrinkage or blend.
+MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, and outputs the weights of the max-Sharpe portfolio also called the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio) (@tbl-tangency). The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem#One_risk-free_asset) can then be applied: since borrowing is allowed via short box spreads, any investor's portfolio converges to using the tangency portfolio weights, and scales it using leverage to their own risk aversion level (more on that in the next section; remember @eq-challenge?).
 
 ```{python}
-#| label: tbl-risky
-#| tbl-cap: "The risky portfolio: max-Sharpe of the BL posterior on the study covariance (real, financed at $R_F$ = 0.19 %)."
+#| label: tbl-tangency
+#| tbl-cap: "The tangency portfolio: max-Sharpe of the BL posterior on the study covariance (real, financed at $R_F$ = 0.19 %)."
 from composition import portfolio_performance, tangency_weights
 
 w_risky = tangency_weights(cov_final, bl_post)
 r_risky, s_risky, sh_risky = portfolio_performance(w_risky, bl_post, cov_final)
-_weights = ((w_risky * 100).round(1).astype(str) + " %").to_frame("risky portfolio")
-_stats = pd.DataFrame(
-    {"risky portfolio": {"E[r]": f"{r_risky:.1%}", "σ": f"{s_risky:.1%}", "Sharpe": f"{sh_risky:.2f}"}}
-)
-pd.concat([_weights, _stats])
+_row = {f"{sleeve} weight": f"{weight:.1%}" for sleeve, weight in w_risky.items()}
+_row.update({"E[r]": f"{r_risky:.1%}", "σ": f"{s_risky:.1%}", "Sharpe": f"{sh_risky:.2f}"})
+tang_vol_fmt = f"{s_risky:.0%}"
+w_equity_fmt = f"{w_risky['equity']:.0%}"
+w_bonds_fmt = f"{w_risky['bonds']:.0%}"
+w_trend_fmt = f"{w_risky['trend']:.0%}"
+w_gold_fmt = f"{w_risky['gold']:.0%}"
+pd.DataFrame([_row]).style.hide(axis="index")
 ```
 
-Equity and bonds anchor the book at ~41 % each, with trend (~9 %) and gold (~8 %) as the diversifiers. Bonds sitting level with equity is the honest consequence of a high (0.7) confidence in a yield-based view the market prices too low, not a thumb on the scale; and gold earns its ~8 % from its equilibrium prior and diversifying covariance alone, no view required.
+Equity and bonds anchor the book at ~`{python} w_equity_fmt` and ~`{python} w_bonds_fmt`, respectively, with trend (~`{python} w_trend_fmt`) and gold (~`{python} w_gold_fmt`) as the diversifiers.
 
 
 # Applying leverage
 
-The risky portfolio's volatility (~7 %) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), reference 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the risky portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
+The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), reference 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the tangency portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
 
 ```{python}
 #| label: leverage-calc
@@ -384,19 +428,19 @@ from leverage import (
 )
 
 k = optimal_leverage(sh_risky, s_risky, GAMMA)
-k_fmt = f"{k:.1f}×"
+k_fmt = f"{k:.2f}:1"
 sstar_fmt = f"{target_volatility(sh_risky, GAMMA):.1%}"
 erlev_fmt = f"{levered_expected_return(sh_risky, GAMMA):.1%}"
 ```
 
-At $\gamma = 2$ that is a gross exposure of `{python} k_fmt`, a target volatility of `{python} sstar_fmt`, and an expected real return of `{python} erlev_fmt`. @tbl-leverage shows the resulting book as fractions of NAV: the financing leg (`cash/borrow`) is the box-spread borrowing.
+At $\gamma = 2$ that is a gross exposure of `{python} k_fmt`, a target volatility of `{python} sstar_fmt`, and an expected real return of `{python} erlev_fmt`. @tbl-leverage shows the resulting book as fractions of NAV: the financing leg (`borrowed cash`) is the box-spread borrowing.
 
 ```{python}
 #| label: tbl-leverage
-#| tbl-cap: "The risky portfolio levered to the CRRA optimum (γ = 2), % of NAV."
+#| tbl-cap: "The tangency portfolio levered to the CRRA optimum (γ = 2), % of NAV."
 pd.DataFrame(
     {"% NAV": (levered_allocation(w_risky, k) * 100).round(0).astype(int).astype(str) + " %"}
-)
+).rename_axis("position").reset_index().style.hide(axis="index")
 ```
 
 The resulting $k^*$ is `{python} k_fmt`. But this is the unconstrained optimum, and a practical cap (portfolio margin, box-spread capacity) may bind below $k^*$ and would tilt the book away from the low-vol sleeves. The real financing rate above already trims $k^*$; any box-spread spread over the risk-free would trim it a little more. @tbl-leverage-gamma shows the sensitivity to $\gamma$.
@@ -407,10 +451,9 @@ The resulting $k^*$ is `{python} k_fmt`. But this is the unconstrained optimum, 
 rows = {}
 for g in [1.5, 2.0, 2.5, 3.0]:
     rows[g] = {
-        "k* (leverage)": f"{optimal_leverage(sh_risky, s_risky, g):.2f}×",
+        "k* (leverage)": f"{optimal_leverage(sh_risky, s_risky, g):.2f}:1",
         "σ* (target vol)": f"{target_volatility(sh_risky, g):.1%}",
         "E[r] real": f"{levered_expected_return(sh_risky, g):.1%}",
     }
-pd.DataFrame(rows).T.rename_axis("γ")
+pd.DataFrame(rows).T.rename_axis("γ").reset_index().style.hide(axis="index").format(precision=1)
 ```
-

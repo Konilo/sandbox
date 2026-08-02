@@ -18,12 +18,14 @@ Market caps (USD tn, 2026; currency is immaterial -- only the ratios enter):
                   falls out of the reverse-opt as beta_MF x premium (~0), and its
                   return enters entirely as a view (He & Litterman 1999).
 
-delta (market risk aversion) is DERIVED, not defaulted: delta = market premium /
-market variance. The market premium is an INDEPENDENT external ERP (not Konilo's
-own views -- that would be circular), triangulated arithmetic / over-bills /
-world: DMS-2026 forward ~4.5-5%, Damodaran implied 4.23%, Kroll 5.0%,
-Fernandez-2026 survey 5.5% -> ~5.0%. With the small bond/gold premia below this
-gives delta ~= 3.6.
+delta (market risk aversion) is DERIVED, not defaulted, and anchored to the
+external equity premium: delta = EQUITY_ERP / cov(equity, market), so the
+market-implied equity return equals the sourced ERP and every other sleeve's
+prior follows from its covariance with the market (no bond or gold premium is
+assumed). The ERP is an INDEPENDENT external number (not Konilo's own views --
+that would be circular), triangulated arithmetic / over-bills / world: DMS-2026
+forward ~4.5-5%, Damodaran implied 4.23%, Kroll 5.0%, Fernandez-2026 survey
+5.5% -> ~5.0%. This gives delta ~= 3.6.
 
 Views (absolute, real) are Konilo's honest from-source estimates (mu.VIEWS_REAL):
 equity 4.03% (Elm P-CAEY), bonds 1.20% (WGBI-DM yield), trend 1.80% (SG CTA).
@@ -48,8 +50,6 @@ from mu import RF_REAL, VIEWS_REAL
 MARKET_CAPS = {"equity": 101.47, "bonds": 30.54, "gold": 15.40}  # USD tn; trend has none
 
 EQUITY_ERP = 0.050  # external, arithmetic, over bills, world (see docstring)
-BOND_PREMIUM = 0.010  # developed-govt term premium over bills (small)
-GOLD_PREMIUM = 0.0  # gold carries ~no risk premium over real bills
 
 VIEW_ASSETS = ("equity", "bonds", "trend")  # gold intentionally has no view
 VIEW_CONFIDENCES = {"equity": 0.8, "bonds": 0.7, "trend": 0.6}  # Idzorek
@@ -63,19 +63,18 @@ def market_weights(index: pd.Index) -> pd.Series:
 
 
 def market_delta(cov: pd.DataFrame) -> float:
-    """Reverse-opt risk aversion delta = external market premium / market variance.
+    """Reverse-opt risk aversion delta, anchored to the external equity premium.
 
-    The market premium is the cap-weighted blend of the *external* per-asset
-    premia (equity ERP dominates), NOT the views -- keeping delta an independent
-    statement about the market rather than a mirror of Konilo's own returns.
+    delta is chosen so the market-implied (equilibrium) excess return on equity
+    equals the external equity risk premium: ``delta = EQUITY_ERP / cov(equity,
+    market)``. Every other sleeve's prior then follows from its covariance with
+    the market -- no separate bond or gold premium is assumed. Equity is ~69% of
+    the market and the only sleeve with a well-identified premium, which is why
+    the market's risk aversion is anchored to it.
     """
     weights = market_weights(cov.index)
-    premia = pd.Series(
-        {"equity": EQUITY_ERP, "bonds": BOND_PREMIUM, "trend": 0.0, "gold": GOLD_PREMIUM}
-    ).reindex(cov.index)
-    market_premium = float(weights @ premia)
-    market_variance = float(weights @ cov.values @ weights)
-    return market_premium / market_variance
+    cov_equity_market = float((cov.values @ weights.values)[cov.index.get_loc("equity")])
+    return EQUITY_ERP / cov_equity_market
 
 
 def equilibrium_prior(cov: pd.DataFrame) -> pd.Series:

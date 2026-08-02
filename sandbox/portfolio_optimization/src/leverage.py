@@ -52,8 +52,8 @@ def levered_allocation(weights: pd.Series, k: float) -> pd.Series:
     """Risky weights scaled to gross exposure ``k`` (as fractions of NAV).
 
     The financing leg is ``1 - k`` (negative = borrowed via box spreads) and is
-    appended as a ``cash/borrow`` row.
+    appended as a ``borrowed cash`` row.
     """
     scaled = weights * k
-    scaled["cash/borrow"] = 1.0 - k
+    scaled["borrowed cash"] = 1.0 - k
     return scaled.rename("% NAV")

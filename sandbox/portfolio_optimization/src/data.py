@@ -12,9 +12,9 @@ Gold: LBMA PM gold fix, ``https://prices.lbma.org.uk/json/gold_pm.json``
       "v": [USD, GBP, EUR]}``; we take the EUR column directly, i.e. LBMA's own
       EUR fixing, so no separate FX conversion is applied.
 
-Equity: MSCI World Standard (Large+Mid Cap), Net, EUR, from the MSCI Index Data
-      Search (``app2.msci.com/products/index-data-search``, indexId 990100,
-      priceLevel NETR, currency EUR; snapshot 2026-07-25). Already month-end
+Equity: MSCI ACWI Standard (Large+Mid Cap), Net, EUR, from the MSCI Index Data
+      Search (``app2.msci.com/products/index-data-search``, indexId 892400,
+      priceLevel NETR, currency EUR; snapshot 2026-08-02). Already month-end
       monthly levels; the trailing MSCI legal disclaimer rows are dropped on load.
 
 Bonds: FTSE World Government Bond - Developed Markets (Hedged EUR), from Curvo's
@@ -44,7 +44,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 LBMA_GOLD_PM_URL = "https://prices.lbma.org.uk/json/gold_pm.json"
 GOLD_RAW = DATA_DIR / "lbma_gold_pm_2026-07-25.json"
-MSCI_WORLD_RAW = DATA_DIR / "msci_world_net_eur_2026-07-25.xls"
+MSCI_ACWI_RAW = DATA_DIR / "msci_acwi_net_eur_2026-08-02.xls"
 
 CURVO_WGBI_URL = (
     "https://curvo.eu/backtest/data/"
@@ -97,8 +97,8 @@ def gold_eur_monthly_returns(raw_path: Path = GOLD_RAW) -> pd.Series:
     return monthly_returns_from_levels(load_gold_eur_levels(raw_path))
 
 
-def load_msci_world_eur_levels(raw_path: Path = MSCI_WORLD_RAW) -> pd.Series:
-    """MSCI World Net EUR month-end levels from the MSCI export.
+def load_msci_acwi_eur_levels(raw_path: Path = MSCI_ACWI_RAW) -> pd.Series:
+    """MSCI ACWI Net EUR month-end levels from the MSCI export.
 
     The sheet carries metadata rows on top and a legal disclaimer at the bottom;
     we keep only rows whose first column parses as a ``"%b %d, %Y"`` date and
@@ -111,13 +111,13 @@ def load_msci_world_eur_levels(raw_path: Path = MSCI_WORLD_RAW) -> pd.Series:
     return pd.Series(
         values[mask].to_numpy(),
         index=pd.DatetimeIndex(dates[mask]),
-        name="msci_world_eur",
+        name="msci_acwi_eur",
     ).sort_index()
 
 
-def msci_world_eur_monthly_returns(raw_path: Path = MSCI_WORLD_RAW) -> pd.Series:
-    """Monthly simple EUR returns for the equity sleeve (MSCI World Net)."""
-    return monthly_returns_from_levels(load_msci_world_eur_levels(raw_path))
+def msci_acwi_eur_monthly_returns(raw_path: Path = MSCI_ACWI_RAW) -> pd.Series:
+    """Monthly simple EUR returns for the equity sleeve (MSCI ACWI Net)."""
+    return monthly_returns_from_levels(load_msci_acwi_eur_levels(raw_path))
 
 
 def download_curvo_wgbi(dest: Path = WGBI_RAW) -> Path:
@@ -203,7 +203,7 @@ def trend_eur_monthly_returns(
 def monthly_returns_matrix() -> pd.DataFrame:
     """The four sleeve return series aligned on their common month-end window."""
     series = {
-        "equity": msci_world_eur_monthly_returns(),
+        "equity": msci_acwi_eur_monthly_returns(),
         "bonds": wgbi_eur_hedged_monthly_returns(),
         "trend": trend_eur_monthly_returns(),
         "gold": gold_eur_monthly_returns(),

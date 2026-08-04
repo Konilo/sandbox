@@ -43,6 +43,7 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
+    toc-expand: 3
     toc-location: left
     number-sections: true
     code-fold: true

@@ -28,7 +28,7 @@ from pypfopt import risk_models
 FREQUENCY = 12
 SHRINKAGE_TARGET = "constant_correlation"
 STOCK_BOND_OVERRIDE = 0.25
-BOND_VOL_OVERRIDE = 0.05
+BOND_VOL_OVERRIDE = 0.043
 
 
 def sample_covariance(returns: pd.DataFrame | None = None) -> pd.DataFrame:

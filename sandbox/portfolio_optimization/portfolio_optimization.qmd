@@ -279,7 +279,7 @@ plt.show()
 
 The regime inspection makes me distrust one correlation (even shrunk): the equity-bonds one. Its 25-year average is roughly zero, but it flipped positive in 2022, peaked near 0.7 in 2025, and is still elevated (~0.5) at the sample end (@fig-rolling-corr). Feeding MVO a ~0 would let it lean on a bond hedge that I don't trust going forward. So I override it to a more conservative 0.25 -- above the historical average, below the current regime -- and leave the other five correlations at their shrunk levels.
 
-I distrust bonds historical volatility for the same reason. Its `{python} bond_sample_vol_fmt` sample figure leans on the structurally calm ZIRP/QE decades (2001-2019 ran ~3.0-3.1 %), but the post-2020 volatility regime has run at or above 5 %, the 36-month rolling vol now sits at about 5.0 % (@fig-rolling-vol). So I raise it to 5 %.
+I distrust the bonds sample volatility for the same reason. The `{python} bond_sample_vol_fmt` figure is a calm-era artifact -- 2001-2019 ran ~3.0-3.1 % under ZIRP/QE -- and understates forward risk. Forward capital market assumptions on exactly this basis cluster at 3.9-4.3 % (J.P. Morgan [2026 LTCMA](https://am.jpmorgan.com/us/en/asset-management/institutional/insights/portfolio-insights/ltcma/) 4.03 % world government hedged-EUR, Amundi [2026](https://research-center.amundi.com/article/capital-market-assumptions-2026) 3.9 % global treasury, Verus [2026](https://www.ipopif.org/Resources/a96343a6-b25e-47d2-b857-99d4e7bea0fe/Verus%202026-Capital-Market-Assumptions.pdf) 4.3 % global sovereign ex-US hedged), and DBZB's own 2022-inclusive 5-year realized volatility is 4.70 % ([justETF](https://www.justetf.com/en/etf-profile.html?isin=LU0378818131)). So I raise the volatility to 4.3 %.
 
 The non-equity sleeves' crisis-hedging value is convex and state-dependent, which is an information a single covariance matrix cannot convey. Editing the correlations cannot capture it. MVO prices these sleeves on their average comovement, so it under-weights the tail protection they offer. This is a known limitation of any single-covariance optimizer, which I accept.
 
@@ -291,14 +291,14 @@ What MVO is fed is the covariance matrix $\Sigma$: its diagonal holds the sleeve
 from covariance import annualized_vols, final_covariance
 
 rho_equity_bonds = 0.25
-sigma_bonds = 0.05
+sigma_bonds = 0.043
 cov_final = final_covariance(returns, rho_equity_bonds=rho_equity_bonds, sigma_bonds=sigma_bonds)
 mask_upper(correlation(cov_final).map("{:.2f}".format))
 ```
 
 ```{python}
 #| label: tbl-final-vol
-#| tbl-cap: "Final annualized volatilities (bond vol overridden to 5%)."
+#| tbl-cap: "Final annualized volatilities (bond vol overridden to 4.3%)."
 (
     pd.DataFrame({"annualized vol": annualized_vols(cov_final).map("{:.1%}".format)})
     .rename_axis("sleeve")
@@ -364,8 +364,8 @@ The market's risk aversion, $\delta$, is computed based on a set of professional
 
 Each sleeve's view is an estimate (partly inspired by Ilmanen's ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)) asset class-specific methods) fed to the Black-Litterman model with a confidence level (between 0 and 1) representing my degree of trust in the estimate (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)):
 
-- **Bonds: ~1.2 % real, confidence 0.7.** DBZB's index, the FTSE World Government Bond Index - Developed Markets, yields 4.08 % to worst at 6.49 years effective duration ([FTSE](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026-07-26); hedging to EUR costs ~0.9 pp^[Hedging a foreign bond to EUR gives up the currency-weighted foreign-minus-EUR short-rate differential (covered interest parity). This 0.9 pp is napkin math: the index is ~40 % USD, where that differential is currently ~2 pp, partly offset by its lower-rate JPY sleeve. It shifts the real figure by only ~±0.2 pp.], leaving ~3.2 % hedged nominal; minus ~2 % expected inflation ([ECB](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.2 % real. The starting yield is a strong forward predictor of bond returns and the CAPM prior is a weak model for bonds, so I lean on the view.
-- **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at **4.03 %** ([Elm Wealth](https://elmwealth.com/capital-market-assumptions/), 2026-07-27). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
+- **Bonds: ~0.9 % real, confidence 0.7.** DBZB's index, the FTSE World Government Bond Index - Developed Markets, yields 3.78 % to maturity at 6.80 years effective duration ([FTSE](https://research.ftserussell.com/Analytics/Factsheets/Home/DownloadSingleIssue?issueName=WGBIDM&IsManual=true), 2026-06-30); hedging to EUR costs ~0.9 pp^[Hedging a foreign bond to EUR gives up the currency-weighted foreign-minus-EUR short-rate differential (covered interest parity). This 0.9 pp is napkin math: the index is ~40 % USD, where that differential is currently ~2 pp, partly offset by its lower-rate JPY sleeve. It shifts the real figure by only ~±0.2 pp.], leaving ~2.9 % hedged nominal; minus ~2 % expected inflation ([ECB](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~0.9 % real. The starting yield is a strong forward predictor of bond returns and the CAPM prior is a weak model for bonds, so I lean on the view.
+- **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at 4.03 % ([Elm Wealth](https://elmwealth.com/capital-market-assumptions/), 2026-07-27). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
 - **Trend: ~2.7 % real, confidence 0.65.** A lot of evidence backs the trend premium. It was positive over every decade since 1800 (Lempérière et al., [2014](https://doi.org/10.21314/JOIS.2014.043)), a diversified time-series-momentum Sharpe above 1 since 1966 (Moskowitz, Ooi & Pedersen, [2012](https://doi.org/10.1016/j.jfineco.2011.11.003)), and robust across a century net of fees (Hurst, Ooi & Pedersen, [2017](https://doi.org/10.3905/jpm.2017.44.1.015)). Its existence is well-established; its magnitude is not, though. Those studies' gross Sharpes of 0.7 to >1 come from stronger, less-crowded pre-2000 trends, while the live net-of-fee SG CTA Index I would track via DBMFE had a Sharpe of only ~0.13 over our sample period. I place my view between those bounds. The EUR-unhedged SG CTA that DBMFE benchmarks carries a ~`{python} trend_vol_fmt` volatility; I assign it a forward net Sharpe of `{python} trend_sharpe_fmt`. Its excess real return is then `{python} trend_sharpe_fmt` × `{python} trend_vol_fmt` ≈ `{python} trend_excess_fmt`, and adding the `{python} rf_real_fmt` real cash rate (cf. @sec-leverage) gives `{python} trend_return_fmt` real. The confidence is set below the ones of equity and bonds, and above what a noisy estimate would get, because the CAPM equilibrium prior is structurally unfit here: trend is an anomaly a single-factor model cannot price correctly which penalizes managed futures given their low beta.
 - **Gold: no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation according to Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198))), so I express nothing and leave gold at its equilibrium prior.
 
@@ -465,3 +465,85 @@ for g in [1.5, 2.0, 2.5, 3.0]:
     }
 pd.DataFrame(rows).T.rename_axis("γ").reset_index().style.hide(axis="index").format(precision=1)
 ```
+
+
+# Margin-call stress test {#sec-stress}
+
+```{python}
+#| label: stress-setup
+#| include: false
+import stress
+from stress import ESTR_NOMINAL
+
+stress_f = ESTR_NOMINAL + 0.005  # base case: €STR + 0.5 %
+stress_path = stress.simulate_path(returns, w_risky, k, 0.0, stress_f, 3)
+rho0_fmt = f"{1 / k:.1%}"
+```
+
+The leverage above follows from my risk aversion; this section answers the separate question any levered strategy must face -- what is the drawdown and margin-call risk -- and answers it out of sample, by pushing the chosen book through history and through bootstrapped paths it was never fit to.
+
+A margin call here is specific. Box-spread financing is a fixed-term loan: the lender cannot pull it or reprice it mid-crisis, which is its advantage over a margin loan. But the borrowed cash buys marked-to-market ETFs, and Interactive Brokers still liquidates if account equity falls below the maintenance requirement on those longs. Normalising net asset value to 1 at gross leverage $k$, with gross book $G_t = \sum_i P_{i,t}$, a loan $L_t$ that accrues the financing rate, and $NAV_t = G_t - L_t$, the margin ratio is $\rho_t = NAV_t / G_t$ and a call fires when $\rho_t < m$, the maintenance ratio. The book starts at $\rho_0 = 1/k =$ `{python} rho0_fmt`.
+
+The test is deliberately severe. I monitor monthly with no preventive deleveraging between rebalances, so the book drifts to higher effective leverage after losses; I rebalance to the target $k$ and weights quarterly (my plan) or annually (the longest unmanaged drift); and I finance at the overnight €STR plus a pessimistic 0.5 % or 1 %, compounded. A margin call is a nominal event and the sleeve series are nominal, so the loan accrues at a nominal rate rather than the study's real $R_F$. This first pass is monthly, which captures month-end drawdowns but misses intra-month spikes: it is a floor on call risk, not the final word -- a daily reconstruction is the next step.
+
+What maintenance ratio applies? Interactive Brokers margins European accounts on a risk-based portfolio model by default ([IBKR stocks](https://www.interactivebrokers.ie/en/trading/margin-stocks.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104), [bonds](https://www.interactivebrokers.ie/en/trading/margin-bonds.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104)), but UCITS funds and ETFs carry a 25 % maintenance requirement, so a book built entirely from UCITS ETFs sits at about 25 % (vincent.p, Cayas co-founder, [forum](https://forum.cayas.fr/t/interview-de-vincent-p-co-fondateur-de-cayas/40/26)). The risk-based model prices low-volatility, liquid sleeves below that -- gold near 7.5 %, low-volatility bond ETFs near 11 % ([forum](https://forum.cayas.fr/t/la-marge-chez-ibkr/1537/2)) -- so a position-weighted blend is at most 25 % and plausibly lower; I take DBMFE at the same 25 % UCITS baseline. The sweep therefore brackets the realistic requirement (25 %) with two stress levels (30 %, 35 %) that stand in for the risk-based model tightening procyclically in a crisis.
+
+@tbl-stress-crisis pushes the actual monthly path through each historical crisis; the drawdown and the lowest margin ratio are independent of $m$, so the ratio is read straight against the three thresholds.
+
+```{python}
+#| label: tbl-stress-crisis
+#| tbl-cap: "The levered book through each crisis: peak-to-trough drawdown and the lowest margin ratio reached (to compare against 25 / 30 / 35 %). Quarterly rebalancing, €STR + 0.5 %."
+stress.crisis_report(returns, w_risky, k, stress_f, 3).style.hide(axis="index")
+```
+
+@tbl-stress-hist runs the full 2001-2026 path across the grid; @tbl-stress-boot bootstraps thirty-year paths from it.
+
+```{python}
+#| label: tbl-stress-hist
+#| tbl-cap: "Full-history run (2001-2026): worst drawdown, lowest margin cushion (ρ − m), and whether/when a call fires. €STR + 0.5 %."
+stress.historical_grid(returns, w_risky, k, spreads=(0.005,)).drop(columns="financing").style.hide(axis="index")
+```
+
+```{python}
+#| label: tbl-stress-boot
+#| tbl-cap: "Block-bootstrapped 30-year paths (2000 runs, 12-month blocks): probability of at least one margin call, and the median and fifth-percentile worst drawdown. €STR + 0.5 %."
+stress.bootstrap_grid(returns, w_risky, k, spreads=(0.005,), n_paths=2000).drop(columns="financing").style.hide(axis="index")
+```
+
+```{python}
+#| label: fig-stress
+#| fig-cap: "The levered book over 2001-2026 (quarterly rebalancing, €STR + 0.5 %): net asset value (top, log scale) and margin ratio (bottom) against the 25 / 30 / 35 % maintenance thresholds. The ratio's low is the dot-com bear."
+import matplotlib.pyplot as plt
+
+from matplotlib.ticker import PercentFormatter
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True, height_ratios=[1.4, 1])
+
+ax1.plot(stress_path.nav.index, stress_path.nav, color="#0072B2", linewidth=1.5)
+ax1.set_yscale("log")
+ax1.set_ylabel("NAV (log, NAV₀ = 1)")
+ax1.grid(True, axis="y", color="0.92")
+ax1.set_axisbelow(True)
+ax1.spines[["top", "right"]].set_visible(False)
+
+ax2.plot(stress_path.ratio.index, stress_path.ratio, color="#CC79A7", linewidth=1.5)
+for m_line, ls in [(0.25, "-"), (0.30, "--"), (0.35, ":")]:
+    ax2.axhline(m_line, color="0.5", linewidth=1.0, linestyle=ls)
+    ax2.text(stress_path.ratio.index[3], m_line + 0.004, f"m = {m_line:.0%}",
+             color="0.4", fontsize=8, va="bottom")
+_lo_date = stress_path.ratio.idxmin()
+ax2.annotate(f"{stress_path.ratio.min():.1%}", xy=(_lo_date, stress_path.ratio.min()),
+             xytext=(0, -13), textcoords="offset points", ha="center",
+             fontsize=8, color="#CC79A7")
+ax2.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+ax2.set_ylabel("Margin ratio ρ")
+ax2.set_ylim(0.22, 0.40)
+ax2.grid(True, axis="y", color="0.92")
+ax2.set_axisbelow(True)
+ax2.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+The picture is consistent across history and simulation, and more comfortable than the leverage alone suggests. The book starts at $\rho_0 = 1/k =$ `{python} rho0_fmt`, above all three thresholds. Under my planned quarterly rebalancing it is never called at any of them: over the full 2001-2026 history the margin ratio never fell below 35 % -- its low is ~36 % in the dot-com bear, which begins with the book already levered into the fall, while the genuine crises of 2008, 2020 and 2022 stayed at 38 % or above -- and no call fires in any bootstrapped thirty-year path at 25 %, 30 % or 35 % (@tbl-stress-crisis, @tbl-stress-hist, @tbl-stress-boot). The one combination that breaks is the most severe: annual rebalancing, a full year of unmanaged drift, against a 35 % requirement -- called once historically (2002) and in ~68 % of bootstrapped paths. At the realistic 25 % UCITS maintenance, or at my quarterly cadence, the margin is wide.
+
+Two honest qualifications. First, the drawdown is severe whether or not a call fires: the median bootstrapped thirty-year path still draws down about 41 %, with a fifth-percentile tail near 61 % (@tbl-stress-boot). Surviving margin is not the same as comfort, and that depth is exactly the risk my $\gamma$ is meant to price. Second, this monthly pass is a floor -- a crash that reverses within a month is invisible to it -- so the daily reconstruction would raise the call estimates. Subject to those caveats, at UCITS maintenance the chosen leverage clears a margin call with room to spare, and the binding risk is the depth of the drawdown, not a forced liquidation.

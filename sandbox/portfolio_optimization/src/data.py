@@ -14,8 +14,9 @@ Gold: LBMA PM gold fix, ``https://prices.lbma.org.uk/json/gold_pm.json``
 
 Equity: MSCI ACWI Standard (Large+Mid Cap), Net, EUR, from the MSCI Index Data
       Search (``app2.msci.com/products/index-data-search``, indexId 892400,
-      priceLevel NETR, currency EUR; snapshot 2026-08-02). Already month-end
-      monthly levels; the trailing MSCI legal disclaimer rows are dropped on load.
+      priceLevel NETR, currency EUR; daily snapshot 2026-08-04). Daily index
+      levels, resampled to month-end for the monthly study (and used raw for the
+      daily stress test); the trailing MSCI legal disclaimer rows are dropped on load.
 
 Bonds: FTSE World Government Bond - Developed Markets (Hedged EUR), from Curvo's
       compiled backtest dataset (``curvo.eu/backtest/data/...json``; snapshot
@@ -28,8 +29,8 @@ Trend: SG CTA Index, the live net-of-fee managed-futures benchmark that the
       the net daily return of a pool of the largest CTAs -- live funds, not a
       back-tested replication. DBMFE (LU2951555403) is a USD-base, *unhedged* EUR
       share class, so the EUR investor bears EUR/USD: we convert the USD level to
-      EUR by dividing by EURUSD (USD per EUR), using Curvo's ``eur-usd.json``
-      (snapshot 2026-07-25), then take month-end returns.
+      EUR by dividing by EURUSD (USD per EUR), using the ECB daily reference rate
+      (snapshot 2026-08-04, resampled to month-end), then take month-end returns.
 """
 
 from __future__ import annotations
@@ -44,7 +45,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 LBMA_GOLD_PM_URL = "https://prices.lbma.org.uk/json/gold_pm.json"
 GOLD_RAW = DATA_DIR / "lbma_gold_pm_2026-07-25.json"
-MSCI_ACWI_RAW = DATA_DIR / "msci_acwi_net_eur_2026-08-02.xls"
+MSCI_ACWI_RAW = DATA_DIR / "msci_acwi_net_eur_daily_2026-08-04.xls"
 
 CURVO_WGBI_URL = (
     "https://curvo.eu/backtest/data/"
@@ -53,8 +54,10 @@ CURVO_WGBI_URL = (
 WGBI_RAW = DATA_DIR / "curvo_ftse_wgbi_dev_hedged_eur_2026-07-25.json"
 
 SG_CTA_RAW = DATA_DIR / "sg_cta_index_2026-07-25.xls"
-CURVO_EURUSD_URL = "https://curvo.eu/backtest/data/eur-usd.json"
-EURUSD_RAW = DATA_DIR / "curvo_eur_usd_2026-07-25.json"
+ECB_EURUSD_URL = (
+    "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
+)
+EURUSD_RAW = DATA_DIR / "ecb_eurusd_daily_2026-08-04.json"
 
 
 def download_lbma_gold(dest: Path = GOLD_RAW) -> Path:
@@ -98,7 +101,7 @@ def gold_eur_monthly_returns(raw_path: Path = GOLD_RAW) -> pd.Series:
 
 
 def load_msci_acwi_eur_levels(raw_path: Path = MSCI_ACWI_RAW) -> pd.Series:
-    """MSCI ACWI Net EUR month-end levels from the MSCI export.
+    """MSCI ACWI Net EUR daily levels from the MSCI export.
 
     The sheet carries metadata rows on top and a legal disclaimer at the bottom;
     we keep only rows whose first column parses as a ``"%b %d, %Y"`` date and
@@ -143,15 +146,24 @@ def wgbi_eur_hedged_monthly_returns(raw_path: Path = WGBI_RAW) -> pd.Series:
     return monthly_returns_from_levels(load_wgbi_eur_levels(raw_path))
 
 
-def download_curvo_eurusd(dest: Path = EURUSD_RAW) -> Path:
-    """Download the Curvo EURUSD (USD per EUR) levels JSON to ``dest``."""
-    with urllib.request.urlopen(CURVO_EURUSD_URL, timeout=60) as resp:
-        dest.write_bytes(resp.read())
+def download_ecb_eurusd(dest: Path = EURUSD_RAW) -> Path:
+    """Download the ECB daily EURUSD reference rate (USD per EUR) to ``dest`` as JSON."""
+    req = urllib.request.Request(ECB_EURUSD_URL, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        lines = resp.read().decode().strip().split("\n")
+    header = lines[0].split(",")
+    di, vi = header.index("TIME_PERIOD"), header.index("OBS_VALUE")
+    records = [
+        {"date": cells[di], "value": float(cells[vi])}
+        for cells in (line.split(",") for line in lines[1:])
+        if cells[vi]
+    ]
+    dest.write_text(json.dumps(records))
     return dest
 
 
 def load_eurusd(raw_path: Path = EURUSD_RAW) -> pd.Series:
-    """EURUSD (USD per EUR), month-end monthly, from the Curvo JSON."""
+    """EURUSD (USD per EUR), daily, from the ECB reference-rate JSON snapshot."""
     records = json.loads(raw_path.read_text())
     index = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in records])
     values = [r["value"] for r in records]
@@ -184,12 +196,12 @@ def load_trend_eur_levels(
 ) -> pd.Series:
     """Month-end trend levels in EUR: USD SG CTA Index level divided by EURUSD.
 
-    The USD index is resampled to month-end, then converted at the month-end
-    EURUSD (USD per EUR); division aligns on the shared month-end index, so the
-    result ends at the earlier of the two series (EURUSD, currently 2026-06).
+    Both series are resampled to month-end (the SG CTA USD level and the ECB
+    daily EURUSD, USD per EUR); division aligns on the shared month-end index, so
+    the result ends at the earlier of the two.
     """
     usd_me = load_sg_cta_usd_levels(cta_path).resample("ME").last()
-    eurusd_me = load_eurusd(eurusd_path)
+    eurusd_me = load_eurusd(eurusd_path).resample("ME").last()
     return (usd_me / eurusd_me).dropna().rename("trend_eur")
 
 

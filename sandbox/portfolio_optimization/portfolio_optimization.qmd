@@ -89,7 +89,7 @@ Historical returns are important, but not sufficient, factors in the determinati
 |---|---|---|---|---|
 | Equity | MSCI ACWI Standard (Large+Mid), Net | EUR (native) | 2001-01 to 2026-06 | [MSCI](https://app2.msci.com/products/index-data-search/regional_chart.jsp?asOf=24/Jul/2026&size=Standard%20(Large%2BMid%20Cap)&scope=R&style=None&currency=EUR&priceLevel=NETR&indexId=892400&indexName=ACWI&suite=C) |
 | Bonds | FTSE WGBI Developed, EUR-hedged | EUR-hedged (native) | 1985-02 to 2026-04 | [Curvo](https://curvo.eu/backtest/en/market-index/ftse-world-government-bond-developed-markets-hedged-eur?currency=eur) |
-| Trend | SG CTA Index, net-of-fee | USD (native) converted to EUR, unhedged | 2000-01 to 2026-07 | [SG Prime Services](https://wholesale.banking.societegenerale.com/en/prime-services-indices/) (index), [Curvo](https://curvo.eu/backtest/data/eur-usd.json) (EUR/USD) |
+| Trend | SG CTA Index, net-of-fee | USD (native) converted to EUR, unhedged | 2000-01 to 2026-07 | [SG Prime Services](https://wholesale.banking.societegenerale.com/en/prime-services-indices/) (index), [ECB](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html) (EUR/USD) |
 | Gold | LBMA PM gold fix | EUR (native) | 1999-02 to 2026-07 | [LBMA](https://prices.lbma.org.uk/json/gold_pm.json) |
 : Return time series used as proxies for the study {#tbl-data}
 

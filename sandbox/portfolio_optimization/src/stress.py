@@ -59,6 +59,16 @@ CRISES = {
     "2022 reflation": ("2021-12", "2022-10"),
 }
 
+# Daily-frequency analogues (stress-test tier 2). The daily window starts 2008-10
+# (DBZB), so 2008 is only partially covered and the dot-com is out of range.
+DAILY_PER_YEAR = 252
+DAILY_REBALANCE = {"quarterly": 63, "annual": 252}  # trading days between resets
+DAILY_CRISES = {
+    "2008 GFC": ("2008-10", "2009-06"),
+    "2020 Covid": ("2020-02", "2020-04"),
+    "2022 reflation": ("2021-12", "2022-10"),
+}
+
 
 def period_financing(f_annual: float, periods_per_year: int = 12) -> float:
     """Per-period compounding-equivalent of an annual financing rate."""
@@ -89,7 +99,7 @@ def simulate_path(
     k: float,
     m: float,
     f_annual: float,
-    rebalance_months: int,
+    rebalance_period: int,
     periods_per_year: int = 12,
 ) -> PathResult:
     """Run the levered book through ``returns`` and track the margin ratio.
@@ -97,42 +107,47 @@ def simulate_path(
     ``returns`` are periodic simple returns per sleeve; ``weights`` the tangency
     weights (target long book, summing to 1); ``k`` gross leverage; ``m`` the
     maintenance ratio. Rebalancing resets the book to ``k`` and ``weights`` every
-    ``rebalance_months`` periods (positional). A call is flagged the first time
+    ``rebalance_period`` periods (positional). A call is flagged the first time
     ``rho_t < m``; the path continues (binary breach, no forced liquidation).
+
+    Vectorised per rebalance segment: within a segment starting at NAV ``v``, the
+    gross book grows as ``v*k*g_t`` (with ``g_t`` the weighted cumulative product
+    of sleeve returns) and the loan as ``v*(k-1)*(1+f)**days``, so ``NAV`` and the
+    margin ratio follow in closed form and only ``v`` recurses across segments.
     """
     w = weights.reindex(returns.columns).to_numpy()
     R = returns.to_numpy()
     f_period = period_financing(f_annual, periods_per_year)
     n = len(returns)
 
-    nav = 1.0
-    pos = w * k * nav
-    loan = (k - 1.0) * nav
     navs = np.empty(n)
     ratios = np.empty(n)
-    first_breach = None
+    nav_start = 1.0
     ruin = False
 
-    for t in range(n):
-        if t % rebalance_months == 0:  # rebalance (incl. t=0 initial set-up)
-            pos = w * k * nav
-            loan = (k - 1.0) * nav
-        pos = pos * (1.0 + R[t])
-        loan = loan * (1.0 + f_period)
-        gross = pos.sum()
-        nav = gross - loan
-        navs[t] = nav
-        ratios[t] = nav / gross if gross > 0 else -np.inf
-        if ratios[t] < m and first_breach is None:
-            first_breach = returns.index[t]
-        if nav <= 0:
+    t = 0
+    while t < n:
+        end = min(t + rebalance_period, n)
+        g = np.cumprod(1.0 + R[t:end], axis=0) @ w  # weighted gross growth since reset
+        factor = (1.0 + f_period) ** np.arange(1, end - t + 1)
+        nav_seg = nav_start * (k * g - (k - 1.0) * factor)
+        gross_seg = nav_start * k * g
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio_seg = np.where(gross_seg > 0, nav_seg / gross_seg, -np.inf)
+        navs[t:end] = nav_seg
+        ratios[t:end] = ratio_seg
+        if (nav_seg <= 0).any():  # ruin: NAV hit zero mid-segment
+            j = int(np.argmax(nav_seg <= 0))
+            navs[t + j :] = nav_seg[j]
+            ratios[t + j :] = -np.inf
             ruin = True
-            navs[t:] = nav
-            ratios[t:] = -np.inf
             break
+        nav_start = nav_seg[-1]
+        t = end
 
     nav_s = pd.Series(navs, index=returns.index)
     ratio_s = pd.Series(ratios, index=returns.index)
+    first_breach = returns.index[int(np.argmax(ratios < m))] if (ratios < m).any() else None
     dd_path = np.concatenate([[1.0], navs])
     return PathResult(
         nav=nav_s,
@@ -152,14 +167,16 @@ def historical_grid(
     maintenance=MAINTENANCE_RATIOS,
     spreads=FINANCING_SPREADS,
     rebalances=REBALANCE_MONTHS,
+    periods_per_year: int = 12,
 ) -> pd.DataFrame:
     """Run the actual historical path across the (m, spread, rebalance) grid."""
     rows = []
-    for reb_name, reb_months in rebalances.items():
+    for reb_name, reb_period in rebalances.items():
         for spread in spreads:
             for m in maintenance:
                 res = simulate_path(
-                    returns, weights, k, m, ESTR_NOMINAL + spread, reb_months
+                    returns, weights, k, m, ESTR_NOMINAL + spread, reb_period,
+                    periods_per_year,
                 )
                 rows.append(
                     {
@@ -184,7 +201,10 @@ def crisis_report(
     weights: pd.Series,
     k: float,
     f_annual: float,
-    rebalance_months: int,
+    rebalance_period: int,
+    *,
+    crises=CRISES,
+    periods_per_year: int = 12,
 ) -> pd.DataFrame:
     """Per-crisis levered drawdown and lowest margin ratio.
 
@@ -192,9 +212,10 @@ def crisis_report(
     threshold), so the reader compares the lowest ``rho`` directly against 25 /
     30 / 35 %. Drawdown is peak-to-trough within each window.
     """
-    res = simulate_path(returns, weights, k, 0.0, f_annual, rebalance_months)
+    res = simulate_path(returns, weights, k, 0.0, f_annual, rebalance_period,
+                        periods_per_year)
     rows = []
-    for name, (start, end) in CRISES.items():
+    for name, (start, end) in crises.items():
         nav_w = res.nav.loc[start:end].to_numpy()
         rho_w = res.ratio.loc[start:end]
         rows.append(
@@ -210,11 +231,36 @@ def crisis_report(
 def block_bootstrap_returns(
     returns: pd.DataFrame, n_periods: int, block: int, rng: np.random.Generator
 ) -> pd.DataFrame:
-    """Concatenate random blocks of consecutive rows into an ``n_periods`` path."""
+    """Concatenate random fixed-length blocks of consecutive rows into a path.
+
+    Preserves serial dependence within each block; breaks it at block boundaries.
+    """
     t = len(returns)
     n_blocks = int(np.ceil(n_periods / block))
     starts = rng.integers(0, t - block + 1, size=n_blocks)
     idx = np.concatenate([np.arange(s, s + block) for s in starts])[:n_periods]
+    return returns.iloc[idx].reset_index(drop=True)
+
+
+def stationary_bootstrap_returns(
+    returns: pd.DataFrame, n_periods: int, mean_block: int, rng: np.random.Generator
+) -> pd.DataFrame:
+    """Politis & Romano (1994) stationary bootstrap.
+
+    Geometric-length blocks (mean ``mean_block``) of consecutive rows, wrapped
+    circularly. Each step continues the current block with probability
+    ``1 - 1/mean_block`` or jumps to a fresh random start otherwise -- so there is
+    no fixed block boundary and the resampled series is stationary, preserving
+    serial dependence more smoothly than fixed blocks.
+    """
+    t = len(returns)
+    restart = rng.random(n_periods) < (1.0 / mean_block)
+    restart[0] = True  # the first draw always starts a block
+    segment = np.cumsum(restart) - 1  # 0-based block index of each step
+    starts = np.flatnonzero(restart)  # step positions where a block begins
+    offset = np.arange(n_periods) - starts[segment]  # position within the block
+    base = rng.integers(0, t, size=len(starts))  # random start row per block
+    idx = (base[segment] + offset) % t  # circular walk from each block's base
     return returns.iloc[idx].reset_index(drop=True)
 
 
@@ -226,42 +272,47 @@ def bootstrap_grid(
     horizon_years: int = 30,
     n_paths: int = 2000,
     block: int = 12,
+    bootstrap: str = "block",
     seed: int = 12345,
     maintenance=MAINTENANCE_RATIOS,
     spreads=FINANCING_SPREADS,
     rebalances=REBALANCE_MONTHS,
+    periods_per_year: int = 12,
 ) -> pd.DataFrame:
-    """Block-bootstrap ``n_paths`` horizon-year paths; tabulate call/drawdown risk.
+    """Bootstrap ``n_paths`` horizon-year paths; tabulate call/drawdown risk.
 
-    ``P(call)`` is the share of paths with at least one ``rho_t < m``; the 95th
-    percentile of max drawdown is the adverse tail. Paths reuse a synthetic index
-    (rebalancing is positional), so dates are irrelevant here.
+    ``bootstrap`` is ``"block"`` (fixed-length blocks) or ``"stationary"`` (Politis
+    & Romano geometric blocks with mean length ``block``). ``P(call)`` is the share
+    of paths with at least one ``rho_t < m``; the fifth percentile of max drawdown
+    is the adverse tail. Paths reuse a synthetic index (rebalancing is positional).
     """
     rng = np.random.default_rng(seed)
-    n_periods = horizon_years * 12
-    paths = [
-        block_bootstrap_returns(returns, n_periods, block, rng) for _ in range(n_paths)
-    ]
+    n_periods = horizon_years * periods_per_year
+    resample = (
+        stationary_bootstrap_returns if bootstrap == "stationary" else block_bootstrap_returns
+    )
+    paths = [resample(returns, n_periods, block, rng) for _ in range(n_paths)]
     rows = []
-    for reb_name, reb_months in rebalances.items():
+    for reb_name, reb_period in rebalances.items():
         for spread in spreads:
+            # The margin-ratio path is independent of m (m only sets the call
+            # threshold), so simulate each path once and read every m off it.
+            min_rho = np.empty(n_paths)
+            dds = np.empty(n_paths)
+            for i, path in enumerate(paths):
+                res = simulate_path(
+                    path, weights, k, 0.0, ESTR_NOMINAL + spread, reb_period,
+                    periods_per_year,
+                )
+                min_rho[i] = res.ratio.min()
+                dds[i] = res.max_drawdown
             for m in maintenance:
-                calls = 0
-                dds = np.empty(n_paths)
-                terminals = np.empty(n_paths)
-                for i, path in enumerate(paths):
-                    res = simulate_path(
-                        path, weights, k, m, ESTR_NOMINAL + spread, reb_months
-                    )
-                    calls += res.first_breach is not None
-                    dds[i] = res.max_drawdown
-                    terminals[i] = res.nav.iloc[-1]
                 rows.append(
                     {
                         "rebalance": reb_name,
                         "financing": f"€STR+{spread:.1%}",
                         "m": f"{m:.0%}",
-                        "P(call) 30y": f"{calls / n_paths:.0%}",
+                        "P(call) 30y": f"{(min_rho < m).mean():.0%}",
                         "DD (median)": f"{np.median(dds):.0%}",
                         "DD (5th pct)": f"{np.percentile(dds, 5):.0%}",
                     }

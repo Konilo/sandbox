@@ -59,6 +59,15 @@ ECB_EURUSD_URL = (
 )
 EURUSD_RAW = DATA_DIR / "ecb_eurusd_daily_2026-08-04.json"
 
+# Daily bond proxy for the margin stress test only (too short for the monthly
+# study): DBZB, the EUR-hedged accumulating global-govt ETF the study targets, so
+# its close is the EUR total-return level. Yahoo Finance daily, from 2008-10.
+DBZB_YAHOO_URL = (
+    "https://query1.finance.yahoo.com/v8/finance/chart/DBZB.DE"
+    "?period1=0&period2=9999999999&interval=1d"
+)
+DBZB_RAW = DATA_DIR / "yahoo_dbzb_de_daily_2026-08-04.json"
+
 
 def download_lbma_gold(dest: Path = GOLD_RAW) -> Path:
     """Download the LBMA PM gold-fix JSON to ``dest`` (refresh the snapshot)."""
@@ -219,5 +228,70 @@ def monthly_returns_matrix() -> pd.DataFrame:
         "bonds": wgbi_eur_hedged_monthly_returns(),
         "trend": trend_eur_monthly_returns(),
         "gold": gold_eur_monthly_returns(),
+    }
+    return pd.concat(series, axis=1, join="inner").sort_index()
+
+
+# --- Daily series (margin stress test only) --------------------------------
+# The monthly study hides intra-month drawdown, so the margin test needs daily
+# data. Equity/gold/trend are daily at source; the bond sleeve uses DBZB (from
+# 2008-10), which sets the common daily window.
+
+
+def download_dbzb(dest: Path = DBZB_RAW) -> Path:
+    """Download DBZB.DE daily close (EUR-hedged govt bond ETF) to ``dest`` as JSON."""
+    import datetime as dt
+
+    req = urllib.request.Request(DBZB_YAHOO_URL, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        result = json.loads(resp.read().decode())["chart"]["result"][0]
+    timestamps = result["timestamp"]
+    close = result["indicators"]["quote"][0]["close"]
+    records = [
+        {"date": dt.datetime.fromtimestamp(t, dt.UTC).strftime("%Y-%m-%d"), "value": c}
+        for t, c in zip(timestamps, close)
+        if c is not None
+    ]
+    dest.write_text(json.dumps(records))
+    return dest
+
+
+def load_dbzb_eur_levels(raw_path: Path = DBZB_RAW) -> pd.Series:
+    """DBZB (EUR-hedged global-govt bond ETF, accumulating) daily EUR levels."""
+    records = json.loads(raw_path.read_text())
+    index = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in records])
+    values = [r["value"] for r in records]
+    return pd.Series(values, index=index, name="dbzb_eur").sort_index()
+
+
+def load_trend_eur_daily_levels(
+    cta_path: Path = SG_CTA_RAW, eurusd_path: Path = EURUSD_RAW
+) -> pd.Series:
+    """Daily trend levels in EUR: daily SG CTA USD level / daily EURUSD.
+
+    Division aligns on the two series' common daily dates (both business-day, with
+    slightly different holiday calendars).
+    """
+    usd = load_sg_cta_usd_levels(cta_path)
+    eurusd = load_eurusd(eurusd_path)
+    return (usd / eurusd).dropna().rename("trend_eur")
+
+
+def daily_returns_from_levels(levels: pd.Series) -> pd.Series:
+    """Daily simple returns from a daily level series (no gap forward-filling)."""
+    return levels.pct_change(fill_method=None).dropna().rename(f"{levels.name}_ret")
+
+
+def daily_returns_matrix() -> pd.DataFrame:
+    """The four sleeve daily returns aligned on their common trading days.
+
+    Equity/gold/trend reach back to 2000-2001; the bond sleeve (DBZB) starts
+    2008-10, which is therefore the start of the common daily window.
+    """
+    series = {
+        "equity": daily_returns_from_levels(load_msci_acwi_eur_levels()),
+        "bonds": daily_returns_from_levels(load_dbzb_eur_levels()),
+        "trend": daily_returns_from_levels(load_trend_eur_daily_levels()),
+        "gold": daily_returns_from_levels(load_gold_eur_levels()),
     }
     return pd.concat(series, axis=1, join="inner").sort_index()

@@ -417,12 +417,10 @@ w_gold_fmt = f"{w_risky['gold']:.0%}"
 pd.DataFrame([_row]).style.hide(axis="index")
 ```
 
-Equity and bonds anchor the book at ~`{python} w_equity_fmt` and ~`{python} w_bonds_fmt`, respectively, with trend (~`{python} w_trend_fmt`) and gold (~`{python} w_gold_fmt`) as the diversifiers.
-
 
 # Applying leverage {#sec-leverage}
 
-The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), reference 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the tangency portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
+The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the tangency portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
 
 ```{python}
 #| label: leverage-calc
@@ -527,17 +525,29 @@ ax1.set_axisbelow(True)
 ax1.spines[["top", "right"]].set_visible(False)
 
 ax2.plot(stress_path.ratio.index, stress_path.ratio, color="#CC79A7", linewidth=1.5)
-for m_line, ls in [(0.25, "-"), (0.30, "--"), (0.35, ":")]:
+for m_line, ls in [(0.35, ":")]:
     ax2.axhline(m_line, color="0.5", linewidth=1.0, linestyle=ls)
-    ax2.text(stress_path.ratio.index[3], m_line + 0.004, f"m = {m_line:.0%}",
-             color="0.4", fontsize=8, va="bottom")
+    ax2.text(
+        stress_path.ratio.index[3],
+        m_line + 0.004,
+        f"m = {m_line:.0%}",
+        color="0.4",
+        fontsize=8,
+        va="bottom",
+    )
 _lo_date = stress_path.ratio.idxmin()
-ax2.annotate(f"{stress_path.ratio.min():.1%}", xy=(_lo_date, stress_path.ratio.min()),
-             xytext=(0, -13), textcoords="offset points", ha="center",
-             fontsize=8, color="#CC79A7")
+ax2.annotate(
+    f"{stress_path.ratio.min():.1%}",
+    xy=(_lo_date, stress_path.ratio.min()),
+    xytext=(0, -13),
+    textcoords="offset points",
+    ha="center",
+    fontsize=8,
+    color="#CC79A7",
+)
 ax2.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
 ax2.set_ylabel("Margin ratio ρ")
-ax2.set_ylim(0.22, 0.40)
+ax2.set_ylim(0.33, 0.5)
 ax2.grid(True, axis="y", color="0.92")
 ax2.set_axisbelow(True)
 ax2.spines[["top", "right"]].set_visible(False)
@@ -547,3 +557,83 @@ plt.show()
 The picture is consistent across history and simulation, and more comfortable than the leverage alone suggests. The book starts at $\rho_0 = 1/k =$ `{python} rho0_fmt`, above all three thresholds. Under my planned quarterly rebalancing it is never called at any of them: over the full 2001-2026 history the margin ratio never fell below 35 % -- its low is ~36 % in the dot-com bear, which begins with the book already levered into the fall, while the genuine crises of 2008, 2020 and 2022 stayed at 38 % or above -- and no call fires in any bootstrapped thirty-year path at 25 %, 30 % or 35 % (@tbl-stress-crisis, @tbl-stress-hist, @tbl-stress-boot). The one combination that breaks is the most severe: annual rebalancing, a full year of unmanaged drift, against a 35 % requirement -- called once historically (2002) and in ~68 % of bootstrapped paths. At the realistic 25 % UCITS maintenance, or at my quarterly cadence, the margin is wide.
 
 Two honest qualifications. First, the drawdown is severe whether or not a call fires: the median bootstrapped thirty-year path still draws down about 41 %, with a fifth-percentile tail near 61 % (@tbl-stress-boot). Surviving margin is not the same as comfort, and that depth is exactly the risk my $\gamma$ is meant to price. Second, this monthly pass is a floor -- a crash that reverses within a month is invisible to it -- so the daily reconstruction would raise the call estimates. Subject to those caveats, at UCITS maintenance the chosen leverage clears a margin call with room to spare, and the binding risk is the depth of the drawdown, not a forced liquidation.
+
+
+## Daily reconstruction {#sec-stress-daily}
+
+```{python}
+#| label: daily-stress-setup
+#| include: false
+from data import daily_returns_matrix
+
+returns_daily = daily_returns_matrix()
+daily_start = f"{returns_daily.index.min():%Y-%m}"
+daily_f = stress.ESTR_NOMINAL + 0.005
+daily_path = stress.simulate_path(
+    returns_daily, w_risky, k, 0.0, daily_f, 63, periods_per_year=252
+)
+daily_min_rho_fmt = f"{daily_path.ratio.min():.1%}"
+daily_min_rho_date = f"{daily_path.ratio.idxmin():%Y-%m}"
+covid_rho_fmt = f"{daily_path.ratio.loc['2020-02':'2020-04'].min():.1%}"
+```
+
+The monthly pass only sees month-end, so a crash that falls and rebounds within a month is invisible to it. This section rebuilds the same test daily. Equity, gold and trend are daily at source; the bond sleeve uses DBZB, the EUR-hedged accumulating ETF the study targets, whose daily history begins in October 2008 and so sets the common window to `{python} daily_start` onward -- shorter than the monthly sample, but covering exactly the fast crashes that intra-month risk is about: the tail of 2008, the March-2020 crash (the fastest on record) and 2022. I monitor daily and reset quarterly (63 trading days).
+
+For the probabilistic pass I switch from fixed blocks to the stationary bootstrap (Politis & Romano, [1994](https://doi.org/10.1080/01621459.1994.10476870)): each path is stitched from blocks of random, geometrically-distributed length (mean about a quarter), wrapped circularly. That preserves the serial structure -- autocorrelation, volatility clustering, the joint behaviour of the sleeves in a crisis -- without committing to one arbitrary block length or leaving hard boundaries between blocks.
+
+Run on the actual daily path, the book is reassuringly robust (@tbl-stress-daily-crisis, @tbl-stress-daily-hist): the margin ratio's daily low over the whole daily window (`{python} daily_start` onward) is `{python} daily_min_rho_fmt` (`{python} daily_min_rho_date`), and the March-2020 crash, captured day by day, bottoms at `{python} covid_rho_fmt` (@fig-stress-covid) -- still clear of the 35 % line. No call fires at any maintenance level historically.
+
+```{python}
+#| label: tbl-stress-daily-crisis
+#| tbl-cap: "Daily path through each crisis: peak-to-trough drawdown and the lowest margin ratio reached (against 25 / 30 / 35 %). Quarterly resets, €STR + 0.5 %."
+stress.crisis_report(
+    returns_daily, w_risky, k, daily_f, 63,
+    crises=stress.DAILY_CRISES, periods_per_year=252,
+).style.hide(axis="index")
+```
+
+```{python}
+#| label: tbl-stress-daily-hist
+#| tbl-cap: "Daily full-window run (2008-2026): worst drawdown, lowest margin cushion (ρ − m), and whether/when a call fires. €STR + 0.5 %."
+stress.historical_grid(
+    returns_daily, w_risky, k, spreads=(0.005,),
+    rebalances=stress.DAILY_REBALANCE, periods_per_year=252,
+).drop(columns="financing").style.hide(axis="index")
+```
+
+```{python}
+#| label: fig-stress-covid
+#| fig-cap: "The margin ratio through the March-2020 crash, day by day."
+import matplotlib.pyplot as plt
+
+from matplotlib.ticker import PercentFormatter
+
+_covid = daily_path.ratio.loc["2020-02-01":"2020-04-30"]
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(_covid.index, _covid, color="#CC79A7", linewidth=1.5)
+for m_line, ls in [(0.35, ":")]:
+    ax.axhline(m_line, color="0.5", linewidth=1.0, linestyle=ls)
+    ax.text(
+        _covid.index[2], m_line + 0.003, f"m = {m_line:.0%}", color="0.4", fontsize=8, va="bottom"
+    )
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+ax.set_ylabel("Margin ratio ρ")
+ax.set_ylim(0.34, 0.46)
+ax.grid(True, axis="y", color="0.92")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+plt.show()
+```
+
+The bootstrap revises the monthly conclusion (@tbl-stress-daily-boot). Intra-quarter moves that month-end marks smooth over do reach the higher maintenance levels over thirty years: a 35 % requirement is called in about three-quarters of paths, and 30 % in a few percent -- where the monthly test had read zero. The mechanism is the reset schedule: a 35 % breach needs a roughly 11 % gross drop inside a single 63-day window, which a March-2020-severity crash delivers, and over thirty years of arbitrary timing you eventually meet one that a reset does not interrupt. The realistic 25 % UCITS maintenance, though, is still never called -- daily or monthly.
+
+```{python}
+#| label: tbl-stress-daily-boot
+#| tbl-cap: "Daily stationary-bootstrap 30-year paths (2000 runs, mean block ~63 trading days): probability of a margin call, and the median and fifth-percentile worst drawdown. €STR + 0.5 %."
+stress.bootstrap_grid(
+    returns_daily, w_risky, k, spreads=(0.005,), rebalances=stress.DAILY_REBALANCE,
+    bootstrap="stationary", block=63, periods_per_year=252, n_paths=2000,
+).drop(columns="financing").style.hide(axis="index")
+```
+
+The daily reconstruction thus confirms the practical conclusion and sharpens the caveat. At the ~25 % maintenance my UCITS book actually faces, the chosen leverage clears a margin call at daily resolution too. But the monthly test's comfort at 30-35 % was partly an artefact of month-end smoothing: those stress levels are reached by fast intra-month crashes the monthly pass could not see. The drawdown stays the binding risk (median and tail close to the monthly, @tbl-stress-daily-boot), and above 25 % the margin buffer is thinner than the floor implied. Two limitations persist: the model still does no preventive deleveraging between resets, which makes the 35 % figure pessimistic; and the DBZB window omits the dot-com, a slow bear the monthly tier already covers.

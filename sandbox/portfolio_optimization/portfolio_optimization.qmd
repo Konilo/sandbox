@@ -133,7 +133,7 @@ The resulting cross-sectionally-complete time frame is `{python} data_start` to 
 pd.DataFrame({"Annualized volatility": (returns.std() * 12**0.5).map("{:.1%}".format)})
 ```
 
-The numbers above are full-period averages that hide large regime shifts, most starkly for bonds: their volatility stood near 3% through the [ZIRP/QE](https://www.investopedia.com/articles/investing/031815/what-zero-interestrate-policy-zirp.asp) decades and roughly doubled after 2020 (@fig-rolling-vol). @fig-rolling-vol shows each sleeve's 36-month rolling annualized volatility.
+The numbers above are full-period averages that hide large regime shifts, most starkly for bonds: their volatility stood near 3 % through the [ZIRP/QE](https://www.investopedia.com/articles/investing/031815/what-zero-interestrate-policy-zirp.asp) decades and roughly doubled after 2020 (@fig-rolling-vol). @fig-rolling-vol shows each sleeve's 36-month rolling annualized volatility.
 
 ```{python}
 #| label: fig-rolling-vol
@@ -160,7 +160,7 @@ ax.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-@tbl-data-corr shows the correlations between each pair of sleeve proxy during the time period under study. As for volatilities, those single numbers hide the regime changes that occured during the period. We will come back to that.
+@tbl-data-corr shows the correlations between each pair of sleeve proxy during the time period under study.
 ```{python}
 #| label: tbl-data-corr
 #| tbl-cap: "Correlation matrix of the sleeves' historical returns."
@@ -189,8 +189,8 @@ avg_corr_fmt = f"{sample_corr.values[off_diagonal].mean():.2f}"
 bond_sample_vol_fmt = f"{returns['bonds'].std() * 12**0.5:.1%}"
 ```
 
-The sample of historical returns allow us to compute a covariance matrix. But, as per Ledoit & Wolf ([2003](http://www.ledoit.net/honey.pdf)), "nobody should be using the sample
-covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} lw_delta_fmt` by the Ledoit-Wolf estimator. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage). The problem targetted by Ledit & Wolf is most important in cases where the number of assets surpasses the number of observations in each return time series which is far from our case, but I apply that method for robustness.
+The sample of historical returns allows us to compute a covariance matrix. But, as per Ledoit & Wolf ([2003](http://www.ledoit.net/honey.pdf)), "nobody should be using the sample
+covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} lw_delta_fmt` by the Ledoit-Wolf estimator^[The problem targetted by Ledoit & Wolf is most important in cases where the number of assets surpasses the number of observations in each return time series which is far from our case, but I apply that method for robustness.]. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage).
 
 ```{python}
 #| label: tbl-shrinkage
@@ -208,15 +208,15 @@ for _i in _shrunk.index:
 mask_upper(_cells)
 ```
 
-The shifts shown in parentheses in @tbl-shrinkage are small, confirming that the pull toward the `{python} avg_corr_fmt` average of the off-diagonal sample correlations is mild.
+The shifts shown in parentheses in @tbl-shrinkage are small, so that the pull toward the `{python} avg_corr_fmt` average correlation is mild.
 
 
 ### Regime inspection
 
 The correlations above -- sample or shrunk -- are full-period averages.
-They hide the evolution of the degree of comovement over time between the sleeves. The optimizer relies on covariances to find the best combination of assets (diversification) and maximize risk-adjusted returns.
-To be more specific, I want equities to be un- or anticorrelated relative to the other sleeves when equities crash. A negative average correlation doesn't provide enough time granularity to examine this.
-So it is important that we scrutinize those single numbers before feeding them to MVO. In @tbl-regime-corr, I bucket the `{python} n_months` months by the sign of the equity return and compute each sleeve's correlation with equity within each bucket.
+They hide the evolution of the degree of comovement over time between the sleeve proxies.
+To be more specific, I want equities to be un- or anticorrelated relative to the other sleeves when equities crash. An average correlation doesn't provide enough time granularity to examine this.
+So it is important that we scrutinize those single numbers before feeding them to MVO. In @tbl-regime-corr, I bucket the `{python} n_months` months of data by the sign of their equity return and compute each sleeve's correlation with equity within each bucket.
 
 ```{python}
 #| label: tbl-regime-corr
@@ -238,13 +238,13 @@ gold_worst_fmt = f"{cc.loc['equity worst quartile', 'gold']:.2f}"
 )
 ```
 
-@tbl-regime-corr tells a different story than the average:
+@tbl-regime-corr shows that:
 
 - Bonds have been a risk-off hedge: increasingly negatively-correlated as equity weakens (down to `{python} bonds_worst_fmt` in the worst quartile).
-- Trend acted as a convex hedge: mildly positively-correlated with equity when equity rises (`{python} trend_up_fmt`), but turning slightly negative when equity falls (`{python} trend_down_fmt` to `{python} trend_worst_fmt`).
-- Gold acted as a tail hedge: roughly uncorrelated when equity rises or falls modestly, but negative (`{python} gold_worst_fmt`) in the worst quartile.
+- Trend acted as a convex hedge: mildly positively-correlated with equity when equity rises (`{python} trend_up_fmt`), but turning slightly negatively-correlated when equity falls (`{python} trend_down_fmt` to `{python} trend_worst_fmt`).
+- Gold acted as a tail hedge: roughly uncorrelated when equity rises or falls modestly, but negatively-correlated (`{python} gold_worst_fmt`) in the worst quartile.
 
-The buckets in @tbl-regime-corr are static -- they pool months regardless of when they occured. @fig-rolling-corr instead shows how equity correlated with the other sleeves over time.
+The buckets in @tbl-regime-corr pool months regardless of when they occured. @fig-rolling-corr instead shows how equity correlated with the other sleeves over time.
 
 ```{python}
 #| label: fig-rolling-corr
@@ -268,18 +268,20 @@ ax.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-@fig-rolling-corr provides new insights:
+@fig-rolling-corr provides additional insights:
 
 - As the [headlines](https://www.aqr.com/Insights/Perspectives/A-Positive-Stock-Bond-Correlation-Is-a-Terrible-Reason-to-Add-More-Equity-Risk-to-Your-Portfolio) said, the stock-bond correlation turned positive. It was negative for most of the period, but flipped sign around 2022 and reached a peak (in our sample) at +0.71 in 2025. The risk-off hedge of the 2000s and 2010s has, for now, become a risk-on co-mover.
-- Trend's correlation to stocks swings widely (from +0.76 in 2006 to -0.35 in 2024), consistent with its convex, regime-dependent profile.
-- And gold's was most stable (-0.33 to +0.39) albeit rarely substantially anticorrelated.
+- Trend's correlation to stocks swings widely (from +0.76 in 2006 to -0.35 in 2024), consistent with its convex, regime-dependent behavior.
+- And gold's was most stable (-0.33 to +0.39), albeit rarely substantially anticorrelated.
 
 
 ### Cautious overrides
 
-The regime inspection makes me distrust one correlation (even shrunk): the equity-bonds one. Its 25-year average is roughly zero, but it flipped positive in 2022, peaked near 0.7 in 2025, and is still elevated (~0.5) at the sample end (@fig-rolling-corr). Feeding MVO a ~0 would let it lean on a bond hedge that I don't trust going forward. So I override it to a more conservative 0.25 -- above the historical average, below the current regime -- and leave the other five correlations at their shrunk levels.
+The regime inspection makes me distrust one correlation (even shrunk): the equity-bonds one. Its 25-year average is roughly zero, but it flipped positive in 2022, peaked near 0.7 in 2025, and is still elevated (~0.5) at the sample end (@fig-rolling-corr). Feeding MVO a ~0 would let it lean on a bond hedge that I don't trust going forward.
+TODO rephrase, invoke longer-term correlation, is a 0/negative corr the norm/a reasonable expectation or a recent setup only?
+So I override it to a more conservative 0.25 -- above the historical average but below the current regime -- and leave the other five correlations at their shrunk levels.
 
-I distrust the bonds sample volatility for the same reason. The `{python} bond_sample_vol_fmt` figure is a calm-era artifact -- 2001-2019 ran ~3.0-3.1 % under ZIRP/QE -- and understates forward risk. Forward capital market assumptions on exactly this basis cluster at 3.9-4.3 % (J.P. Morgan [2026 LTCMA](https://am.jpmorgan.com/us/en/asset-management/institutional/insights/portfolio-insights/ltcma/) 4.03 % world government hedged-EUR, Amundi [2026](https://research-center.amundi.com/article/capital-market-assumptions-2026) 3.9 % global treasury, Verus [2026](https://www.ipopif.org/Resources/a96343a6-b25e-47d2-b857-99d4e7bea0fe/Verus%202026-Capital-Market-Assumptions.pdf) 4.3 % global sovereign ex-US hedged), and DBZB's own 2022-inclusive 5-year realized volatility is 4.70 % ([justETF](https://www.justetf.com/en/etf-profile.html?isin=LU0378818131)). So I raise the volatility to 4.3 %.
+I distrust the bonds sample volatility for the same reason. The `{python} bond_sample_vol_fmt` figure is, I would argue, non-representative enough (e.g., because 2001-2019 ran ~3.0-3.1 % under ZIRP/QE) and may be too optimistic going forward. Forward capital market assumptions cluster at 3.9-4.3 % (J.P. Morgan [2026 LTCMA](https://am.jpmorgan.com/us/en/asset-management/institutional/insights/portfolio-insights/ltcma/) 4.03 % world government hedged-EUR, Amundi [2026](https://research-center.amundi.com/article/capital-market-assumptions-2026) 3.9 % global treasury, Verus [2026](https://www.ipopif.org/Resources/a96343a6-b25e-47d2-b857-99d4e7bea0fe/Verus%202026-Capital-Market-Assumptions.pdf) 4.3 % global sovereign ex-US hedged), and DBZB's own 2022-inclusive 5-year realized volatility is 4.70 % ([justETF](https://www.justetf.com/en/etf-profile.html?isin=LU0378818131)). So I raise the volatility to 4.3 %.
 
 The non-equity sleeves' crisis-hedging value is convex and state-dependent, which is an information a single covariance matrix cannot convey. Editing the correlations cannot capture it. MVO prices these sleeves on their average comovement, so it under-weights the tail protection they offer. This is a known limitation of any single-covariance optimizer, which I accept.
 
@@ -298,7 +300,7 @@ mask_upper(correlation(cov_final).map("{:.2f}".format))
 
 ```{python}
 #| label: tbl-final-vol
-#| tbl-cap: "Final annualized volatilities (bond vol overridden to 4.3%)."
+#| tbl-cap: "Final annualized volatilities (bond vol overridden to 4.3 %)."
 (
     pd.DataFrame({"annualized vol": annualized_vols(cov_final).map("{:.1%}".format)})
     .rename_axis("sleeve")

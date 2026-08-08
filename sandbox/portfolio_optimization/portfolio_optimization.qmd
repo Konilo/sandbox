@@ -402,6 +402,28 @@ This posterior is the MVO input. The posterior equity return is not far from my 
 
 MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, and outputs the weights of the max-Sharpe portfolio also called the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio) (@tbl-tangency). The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem#One_risk-free_asset) can then be applied: since borrowing is allowed via short box spreads, any investor's portfolio converges to using the tangency portfolio weights, and scales it using leverage to their own risk aversion level (more on that in the next section; remember @eq-challenge?).
 
+@tbl-mvo-inputs first consolidates what the optimiser sees per sleeve -- posterior excess return, volatility, Sharpe, and correlation with equity -- next to the weight each receives.
+
+```{python}
+#| label: tbl-mvo-inputs
+#| tbl-cap: "What MVO sees per sleeve: posterior return, volatility, Sharpe, and correlation with equity, next to the resulting tangency weight (real, financed at $R_F$ = 0.19 %)."
+from composition import tangency_weights
+from mu import RF_REAL
+
+_vols = annualized_vols(cov_final)
+_w = tangency_weights(cov_final, bl_post)
+pd.DataFrame(
+    {
+        "posterior μ": bl_post.map("{:.2%}".format),
+        "excess (μ − RF)": (bl_post - RF_REAL).map("{:.2%}".format),
+        "ann vol σ": _vols.map("{:.1%}".format),
+        "Sharpe": ((bl_post - RF_REAL) / _vols).map("{:.2f}".format),
+        "corr w/ equity": correlation(cov_final)["equity"].map("{:.2f}".format),
+        "tangency weight": _w.map("{:.1%}".format),
+    }
+).rename_axis("sleeve").reset_index().style.hide(axis="index")
+```
+
 ```{python}
 #| label: tbl-tangency
 #| tbl-cap: "The tangency portfolio: max-Sharpe of the Black-Litterman model's posterior returns and of the covariance matrix (real, financed at $R_F$ = 0.19 %)."

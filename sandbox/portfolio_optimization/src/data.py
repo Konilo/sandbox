@@ -18,10 +18,16 @@ Equity: MSCI ACWI Standard (Large+Mid Cap), Net, EUR, from the MSCI Index Data
       levels, resampled to month-end for the monthly study (and used raw for the
       daily stress test); the trailing MSCI legal disclaimer rows are dropped on load.
 
-Bonds: FTSE World Government Bond - Developed Markets (Hedged EUR), from Curvo's
-      compiled backtest dataset (``curvo.eu/backtest/data/...json``; snapshot
-      2026-07-25). Monthly month-end index levels back to 1985. This is Curvo's
-      compilation, not primary FTSE Russell data.
+Bonds: US Treasury 7-10y, EUR-hedged. The vehicle is a EUR-hedged UCITS ETF on the
+      ICE US Treasury 7-10y index (e.g. iShares CEMF, IE000K1VI152; or Amundi 7USH
+      on the Bloomberg 7-10y index). The EUR-hedged total return is the local USD
+      total return plus the one-month covered-interest-parity carry,
+      ``(i_EUR - i_USD) / 12``. Proxied by IEF (US-listed, same ICE index, long
+      history): its dividend-adjusted close is the USD total-return level (Yahoo
+      daily, snapshot 2026-08-08, from 2002-07), and month-end USD returns plus the
+      carry from FRED short rates (1-month UST DGS1MO, euro overnight
+      IRSTCI01EZM156N) give the hedged EUR return. Validated at 0.99 monthly
+      correlation against the live hedged ETFs (7USH 2023+, CEMF 2025+).
 
 Trend: SG CTA Index, the live net-of-fee managed-futures benchmark that the
       vehicle DBMFE replicates, from SG Prime Services (snapshot 2026-07-25).
@@ -47,26 +53,24 @@ LBMA_GOLD_PM_URL = "https://prices.lbma.org.uk/json/gold_pm.json"
 GOLD_RAW = DATA_DIR / "lbma_gold_pm_2026-07-25.json"
 MSCI_ACWI_RAW = DATA_DIR / "msci_acwi_net_eur_daily_2026-08-04.xls"
 
-CURVO_WGBI_URL = (
-    "https://curvo.eu/backtest/data/"
-    "ftse-world-government-bond-developed-markets-hedged-eur.json"
+IEF_YAHOO_URL = (
+    "https://query1.finance.yahoo.com/v8/finance/chart/IEF"
+    "?period1=0&period2=9999999999&interval=1d&events=div"
 )
-WGBI_RAW = DATA_DIR / "curvo_ftse_wgbi_dev_hedged_eur_2026-07-25.json"
+IEF_RAW = DATA_DIR / "yahoo_ief_daily_2026-08-08.json"
+
+# Short rates for the EUR hedge carry (covered-interest-parity): the 1-month US
+# Treasury rate and the euro-area overnight interbank rate, both from FRED.
+FRED_USD_1M_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS1MO"
+FRED_USD_1M_RAW = DATA_DIR / "fred_DGS1MO_2026-08-08.csv"
+FRED_EUR_ON_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=IRSTCI01EZM156N"
+FRED_EUR_ON_RAW = DATA_DIR / "fred_IRSTCI01EZM156N_2026-08-08.csv"
 
 SG_CTA_RAW = DATA_DIR / "sg_cta_index_2026-07-25.xls"
 ECB_EURUSD_URL = (
     "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
 )
 EURUSD_RAW = DATA_DIR / "ecb_eurusd_daily_2026-08-04.json"
-
-# Daily bond proxy for the margin stress test only (too short for the monthly
-# study): DBZB, the EUR-hedged accumulating global-govt ETF the study targets, so
-# its close is the EUR total-return level. Yahoo Finance daily, from 2008-10.
-DBZB_YAHOO_URL = (
-    "https://query1.finance.yahoo.com/v8/finance/chart/DBZB.DE"
-    "?period1=0&period2=9999999999&interval=1d"
-)
-DBZB_RAW = DATA_DIR / "yahoo_dbzb_de_daily_2026-08-04.json"
 
 
 def download_lbma_gold(dest: Path = GOLD_RAW) -> Path:
@@ -132,27 +136,94 @@ def msci_acwi_eur_monthly_returns(raw_path: Path = MSCI_ACWI_RAW) -> pd.Series:
     return monthly_returns_from_levels(load_msci_acwi_eur_levels(raw_path))
 
 
-def download_curvo_wgbi(dest: Path = WGBI_RAW) -> Path:
-    """Download the Curvo WGBI-hedged-EUR levels JSON to ``dest``."""
-    with urllib.request.urlopen(CURVO_WGBI_URL, timeout=60) as resp:
-        dest.write_bytes(resp.read())
+def download_ief(dest: Path = IEF_RAW) -> Path:
+    """Download IEF daily dividend-adjusted close (US iShares 7-10y Treasury) as JSON.
+
+    IEF is distributing, so the *adjusted* close (dividends reinvested), not the raw
+    close, is the USD total-return level.
+    """
+    import datetime as dt
+
+    req = urllib.request.Request(IEF_YAHOO_URL, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        result = json.loads(resp.read().decode())["chart"]["result"][0]
+    timestamps = result["timestamp"]
+    adjclose = result["indicators"]["adjclose"][0]["adjclose"]
+    records = [
+        {"date": dt.datetime.fromtimestamp(t, dt.UTC).strftime("%Y-%m-%d"), "value": v}
+        for t, v in zip(timestamps, adjclose)
+        if v is not None
+    ]
+    dest.write_text(json.dumps(records))
     return dest
 
 
-def load_wgbi_eur_levels(raw_path: Path = WGBI_RAW) -> pd.Series:
-    """FTSE WGBI Developed (Hedged EUR) month-end levels from the Curvo JSON.
+def load_ief_usd_levels(raw_path: Path = IEF_RAW) -> pd.Series:
+    """IEF daily USD total-return levels (dividend-adjusted close).
 
-    The file is a list of ``{"date": "YYYY-MM-DD", "value": level}`` records.
+    IEF tracks the ICE US Treasury 7-10y index -- the same index the EUR-hedged
+    UCITS wrapper the study targets (e.g. iShares CEMF) hedges -- with a longer
+    history. The file is a list of ``{"date", "value"}`` records.
     """
     records = json.loads(raw_path.read_text())
     index = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in records])
     values = [r["value"] for r in records]
-    return pd.Series(values, index=index, name="wgbi_eur_hedged").sort_index()
+    return pd.Series(values, index=index, name="ustsy_usd").sort_index()
 
 
-def wgbi_eur_hedged_monthly_returns(raw_path: Path = WGBI_RAW) -> pd.Series:
-    """Monthly simple EUR returns for the bond sleeve (WGBI Developed, EUR-hedged)."""
-    return monthly_returns_from_levels(load_wgbi_eur_levels(raw_path))
+def download_fred(url: str, dest: Path) -> Path:
+    """Download a FRED series CSV (``date,value`` rows) to ``dest``."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        dest.write_bytes(resp.read())
+    return dest
+
+
+def _fred_rate_me(raw_path: Path) -> pd.Series:
+    """Month-end FRED rate as a decimal (percent / 100); missing '.' rows dropped."""
+    df = pd.read_csv(raw_path)
+    col = df.columns[1]
+    df = df[df[col] != "."]
+    s = pd.Series(
+        pd.to_numeric(df[col]).to_numpy(),
+        index=pd.DatetimeIndex(pd.to_datetime(df.iloc[:, 0])),
+    ).sort_index()
+    s = s.resample("ME").last() / 100.0
+    s.index = s.index.to_period("M").to_timestamp("M")
+    return s
+
+
+def eur_minus_usd_carry(
+    usd_path: Path = FRED_USD_1M_RAW, eur_path: Path = FRED_EUR_ON_RAW
+) -> pd.Series:
+    """Month-end EUR-minus-USD short-rate differential (annualized decimal).
+
+    The covered-interest-parity carry of a EUR-hedged USD bond: ``i_EUR - i_USD``,
+    negative when USD rates exceed EUR rates (the usual hedging cost). The euro leg
+    (FRED IRSTCI01EZM156N) lags ~7 months and is forward-filled on the tail; the
+    resulting carry error is ~0.02 %/month, immaterial to the covariance.
+    """
+    usd = _fred_rate_me(usd_path)
+    eur = _fred_rate_me(eur_path)
+    return (eur.reindex(usd.index).ffill() - usd).dropna().rename("carry")
+
+
+def ustsy_hedged_monthly_returns(
+    ief_path: Path = IEF_RAW,
+    usd_path: Path = FRED_USD_1M_RAW,
+    eur_path: Path = FRED_EUR_ON_RAW,
+) -> pd.Series:
+    """Monthly EUR-hedged US Tsy 7-10y returns: local USD return + CIP carry.
+
+        hedged = local_usd_return + (i_EUR - i_USD) / 12
+
+    ``local_usd_return`` is IEF's month-end total return (USD); the carry is set at
+    the start of the month (prior month-end rates). Validated at 0.99 monthly
+    correlation against the live hedged ETFs 7USH (2023+) and CEMF (2025+).
+    """
+    local = load_ief_usd_levels(ief_path).resample("ME").last().pct_change()
+    carry = eur_minus_usd_carry(usd_path, eur_path).reindex(local.index).ffill().shift(1) / 12.0
+    return (local + carry).dropna().rename("ustsy_hedged_ret")
 
 
 def download_ecb_eurusd(dest: Path = EURUSD_RAW) -> Path:
@@ -225,43 +296,37 @@ def monthly_returns_matrix() -> pd.DataFrame:
     """The four sleeve return series aligned on their common month-end window."""
     series = {
         "equity": msci_acwi_eur_monthly_returns(),
-        "bonds": wgbi_eur_hedged_monthly_returns(),
+        "bonds": ustsy_hedged_monthly_returns(),
         "trend": trend_eur_monthly_returns(),
         "gold": gold_eur_monthly_returns(),
     }
     return pd.concat(series, axis=1, join="inner").sort_index()
 
 
-# --- Daily series (margin stress test only) --------------------------------
-# The monthly study hides intra-month drawdown, so the margin test needs daily
-# data. Equity/gold/trend are daily at source; the bond sleeve uses DBZB (from
-# 2008-10), which sets the common daily window.
+# --- Daily series (margin stress test) -------------------------------------
+# The margin test runs daily to catch intra-month spikes. Equity/gold/trend are
+# daily at source; the bond sleeve is the same hedged US Tsy construction as the
+# monthly sleeve (IEF daily plus the CIP carry), so the common daily window
+# reaches back to 2002-07 (IEF) -- covering every crisis the monthly sample does.
 
 
-def download_dbzb(dest: Path = DBZB_RAW) -> Path:
-    """Download DBZB.DE daily close (EUR-hedged govt bond ETF) to ``dest`` as JSON."""
-    import datetime as dt
+def load_ustsy_hedged_daily_levels(
+    ief_path: Path = IEF_RAW,
+    usd_path: Path = FRED_USD_1M_RAW,
+    eur_path: Path = FRED_EUR_ON_RAW,
+) -> pd.Series:
+    """Daily EUR-hedged US Tsy 7-10y total-return level: IEF local + CIP carry.
 
-    req = urllib.request.Request(DBZB_YAHOO_URL, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read().decode())["chart"]["result"][0]
-    timestamps = result["timestamp"]
-    close = result["indicators"]["quote"][0]["close"]
-    records = [
-        {"date": dt.datetime.fromtimestamp(t, dt.UTC).strftime("%Y-%m-%d"), "value": c}
-        for t, c in zip(timestamps, close)
-        if c is not None
-    ]
-    dest.write_text(json.dumps(records))
-    return dest
-
-
-def load_dbzb_eur_levels(raw_path: Path = DBZB_RAW) -> pd.Series:
-    """DBZB (EUR-hedged global-govt bond ETF, accumulating) daily EUR levels."""
-    records = json.loads(raw_path.read_text())
-    index = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in records])
-    values = [r["value"] for r in records]
-    return pd.Series(values, index=index, name="dbzb_eur").sort_index()
+    Daily analogue of ``ustsy_hedged_monthly_returns``: IEF's daily USD total
+    return plus a daily slice of the (i_EUR - i_USD) carry (the monthly FRED
+    differential forward-filled, divided by 252), compounded to a level (base ~1).
+    """
+    local_ret = load_ief_usd_levels(ief_path).pct_change()
+    carry_daily = (
+        eur_minus_usd_carry(usd_path, eur_path).reindex(local_ret.index, method="ffill") / 252.0
+    )
+    hedged_ret = (local_ret + carry_daily).dropna()
+    return (1.0 + hedged_ret).cumprod().rename("ustsy_hedged")
 
 
 def load_trend_eur_daily_levels(
@@ -285,12 +350,12 @@ def daily_returns_from_levels(levels: pd.Series) -> pd.Series:
 def daily_returns_matrix() -> pd.DataFrame:
     """The four sleeve daily returns aligned on their common trading days.
 
-    Equity/gold/trend reach back to 2000-2001; the bond sleeve (DBZB) starts
-    2008-10, which is therefore the start of the common daily window.
+    Equity/gold/trend reach back to 2000-2001; the hedged US Tsy bond sleeve
+    (IEF + carry) starts 2002-07, which sets the common daily window.
     """
     series = {
         "equity": daily_returns_from_levels(load_msci_acwi_eur_levels()),
-        "bonds": daily_returns_from_levels(load_dbzb_eur_levels()),
+        "bonds": daily_returns_from_levels(load_ustsy_hedged_daily_levels()),
         "trend": daily_returns_from_levels(load_trend_eur_daily_levels()),
         "gold": daily_returns_from_levels(load_gold_eur_levels()),
     }

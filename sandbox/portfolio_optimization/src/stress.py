@@ -27,10 +27,10 @@ financing rate (``ESTR_NOMINAL`` + spread), not the study's real ``RF_REAL``.
 The margin ratio is invariant to that choice anyway (a common deflator cancels
 in NAV/Gross), but nominal keeps returns and financing on the same footing.
 
-TIER 1 (monthly) -- this run is a FLOOR on call risk, not the answer: month-end
-marks miss intra-month spikes (a crash that reverses within a month is invisible),
-so realised call risk is higher. The daily reconstruction (tier 2) is the credible
-version for the post.
+The test runs DAILY: month-end marks would miss intra-month spikes (a crash that
+reverses inside a month), so the daily path is the credible version. The daily
+window reaches back to 2002-07 (IEF), covering the dot-com tail, the GFC, Covid
+and 2022 at daily resolution -- so no separate monthly pass is needed.
 """
 
 from __future__ import annotations
@@ -59,8 +59,8 @@ CRISES = {
     "2022 reflation": ("2021-12", "2022-10"),
 }
 
-# Daily-frequency analogues (stress-test tier 2). The daily window starts 2008-10
-# (DBZB), so 2008 is only partially covered and the dot-com is out of range.
+# Daily crisis windows. The daily window starts 2002-07 (IEF), so the GFC, Covid
+# and 2022 are fully covered; the dot-com bear is caught only in its final months.
 DAILY_PER_YEAR = 252
 DAILY_REBALANCE = {"quarterly": 63, "annual": 252}  # trading days between resets
 DAILY_CRISES = {

@@ -12,7 +12,7 @@ Decisions (each set with Konilo; see the "Expected returns" section):
 
 Market caps (USD tn, 2026; currency is immaterial -- only the ratios enter):
   equity  101.47  MSCI ACWI free-float market cap (factsheet, 2026-06-30)
-  bonds    30.54  FTSE WGBI-Developed index *market value* (factsheet, 2026-06-30)
+  bonds    21.66  US Treasury notes + bonds outstanding (FiscalData MSPD, 2026-07-31)
   gold     15.40  WGC "financial gold" (bars/coins/ETF + official), 2025-12-31
   trend     0.00  managed futures is zero-net-supply -> no market cap; its prior
                   falls out of the reverse-opt as beta_MF x premium (~0), and its
@@ -28,13 +28,14 @@ forward ~4.5-5%, Damodaran implied 4.23%, Kroll 5.0%, Fernandez-2026 survey
 5.5% -> ~5.0%. This gives delta ~= 3.6.
 
 Views (absolute, real) are Konilo's honest from-source estimates (mu.VIEWS_REAL):
-equity 4.03% (Elm P-CAEY), bonds 0.90% (WGBI-DM yield), trend 2.70% (forward).
+equity 4.03% (Elm P-CAEY), bonds 1.0% (US Tsy YTM, EUR-hedged), trend 2.70% (forward).
 Gold gets NO view (no forward anchor) -> it stays at its equilibrium prior.
 Per-view Idzorek confidences reflect each view's reliability vs the prior:
   equity 0.8  P-CAEY forward/valuation-aware; the prior is valuation-blind and
               higher, so trust the view (Cayas corroborates a low equity ~3.5%).
-  bonds  0.7  the starting yield is a strong forward predictor; the CAPM prior is
-              a weak model for bonds, so lean on the view.
+  bonds  0.7  the starting yield is a strong forward predictor of the (hedged)
+              return and the CAPM prior is a weak model for bonds, so lean on the
+              view; hedging strips the FX leg, so no confidence haircut for it.
   trend  0.65 forward view (not a backward mean); the CAPM prior is structurally
               unfit for a ~0-beta anomaly, and the premium's existence is the
               best-evidenced in the set, so lean on the view. Cayas 2.7% agrees.
@@ -48,7 +49,7 @@ from pypfopt.black_litterman import BlackLittermanModel
 
 from mu import RF_REAL, VIEWS_REAL
 
-MARKET_CAPS = {"equity": 101.47, "bonds": 30.54, "gold": 15.40}  # USD tn; trend has none
+MARKET_CAPS = {"equity": 101.47, "bonds": 21.66, "gold": 15.40}  # USD tn; trend has none
 
 EQUITY_ERP = 0.050  # external, arithmetic, over bills, world (see docstring)
 

@@ -9,13 +9,14 @@ average sample correlation): for four cross-asset sleeves it is a more
 defensible prior than the ``single_factor`` market model (ill-defined for gold
 and managed futures) or the ``constant_variance`` scaled identity.
 
-Pass 3 (cautious overrides): the regime inspection shows the equity-bonds
-correlation is unstable and currently positive, so ``final_covariance`` overrides
-just that pair to a conservative value (default 0.25), leaving the other five
-correlations at their shrunk levels. It also overrides the bond volatility: the
-full-sample 3.8% leans on the structurally calm ZIRP/QE decades, so it is raised
-to a forward-realistic ~5% (the ETF's 3y factsheet std is 4.48%, recent realized
-~5%). Both overrides are targeted and meant to be swept.
+Pass 3 (no overrides): the shrunk covariance is used as-is. The equity-bonds
+correlation the earlier (unhedged) design distrusted is, for the EUR-hedged US
+Treasury sleeve, a structural flight-to-quality decorrelation and the very
+reason the sleeve was chosen; overriding it away would be inconsistent, so it is
+left at its Ledoit-Wolf-shrunk level, which already tempers the raw estimate. Its
+one failure mode (inflation shocks, e.g. 2022) is covered by the gold and trend
+sleeves, not by distorting this input. ``final_covariance`` still exposes optional
+``rho_equity_bonds`` / ``sigma_bonds`` overrides for sweeps, but both default off.
 """
 
 from __future__ import annotations
@@ -27,8 +28,6 @@ from pypfopt import risk_models
 
 FREQUENCY = 12
 SHRINKAGE_TARGET = "constant_correlation"
-STOCK_BOND_OVERRIDE = 0.25
-BOND_VOL_OVERRIDE = 0.043
 
 
 def sample_covariance(returns: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -103,18 +102,18 @@ def apply_volatility_overrides(cov: pd.DataFrame, overrides: dict[str, float]) -
 
 def final_covariance(
     returns: pd.DataFrame | None = None,
-    rho_equity_bonds: float = STOCK_BOND_OVERRIDE,
-    sigma_bonds: float | None = BOND_VOL_OVERRIDE,
+    rho_equity_bonds: float | None = None,
+    sigma_bonds: float | None = None,
 ) -> pd.DataFrame:
-    """Shrunk covariance with the equity-bonds correlation and bond vol overridden.
+    """Shrunk covariance, optionally with targeted overrides (both off by default).
 
-    Both are swept variables. ``rho_equity_bonds`` overrides just that pair; the
-    other five correlations stay at their Ledoit-Wolf-shrunk levels.
-    ``sigma_bonds`` raises the bond volatility off its calm-era 3.8% to a
-    forward-realistic level; pass ``None`` to keep the historical vol.
+    With both arguments ``None`` this returns the Ledoit-Wolf-shrunk covariance
+    unchanged. ``rho_equity_bonds`` overrides just that correlation pair;
+    ``sigma_bonds`` overrides the bond volatility. Kept for sensitivity sweeps.
     """
     cov, _ = ledoit_wolf_covariance(returns)
-    cov = apply_correlation_overrides(cov, {("equity", "bonds"): rho_equity_bonds})
+    if rho_equity_bonds is not None:
+        cov = apply_correlation_overrides(cov, {("equity", "bonds"): rho_equity_bonds})
     if sigma_bonds is not None:
         cov = apply_volatility_overrides(cov, {"bonds": sigma_bonds})
     return cov

@@ -1,16 +1,9 @@
-"""Regime inspection (pass 2).
+"""Regime inspection: state-dependent correlations and volatilities.
 
-The full-sample correlations are an average that hides state-dependent
-diversification. Here we test the actual thesis -- that trend and gold
-decorrelate from equities *when equities fall* -- two ways:
-
-- ``conditional_correlations``: bucket the months by equity state and recompute
-  each sleeve's correlation with equity per bucket (uses all data, no dates).
-- ``rolling_correlations``: a 36-month rolling correlation with equity over
-  time, to see the 2022 stock-bond flip and the crisis dips continuously.
-- ``rolling_volatility``: each sleeve's 36-month rolling annualized volatility,
-  to see that the single-number vols hide large regime shifts (e.g. the bond
-  vol regime change post-2020).
+- ``conditional_correlations``: each sleeve's correlation with equity, bucketed
+  by equity state (all data, no dates).
+- ``rolling_correlations``: 36-month rolling correlation with equity over time.
+- ``rolling_volatility``: each sleeve's 36-month rolling annualized volatility.
 """
 
 from __future__ import annotations

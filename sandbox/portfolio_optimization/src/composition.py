@@ -1,11 +1,9 @@
 """Portfolio composition: the unlevered risky-portfolio weights.
 
-With a real risk-free asset (borrow at ~rf via short box spreads) and leverage,
-two-fund separation says every investor holds the *same* risky portfolio -- the
-max-Sharpe tangency of the Black-Litterman posterior (``black_litterman.py``) --
-scaled by risk appetite (that scaling is the leverage step, ``leverage.py``).
-Black-Litterman supplies the humility (its posterior is already shrunk toward the
-market prior), so the tangency is taken directly, with no further shrinkage.
+The risky book is the long-only max-Sharpe tangency of the Black-Litterman
+posterior (``black_litterman.py``), taken directly with no further shrinkage
+(the BL posterior is already shrunk toward the market prior). ``leverage.py``
+then scales it to risk appetite.
 """
 
 from __future__ import annotations

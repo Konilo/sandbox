@@ -1,9 +1,7 @@
 """Margin-call stress test for the levered book (evaluation, not allocation).
 
-This module changes nothing about the allocation. It takes the chosen tangency
-weights and CRRA leverage ``k`` and pushes them through history and through
-block-bootstrapped paths, answering the first question any levered-strategy post
-gets: what is the drawdown and margin-call risk?
+Pushes the chosen tangency weights and CRRA leverage ``k`` through history and
+through bootstrapped paths to quantify drawdown and forced-liquidation risk.
 
 Margin mechanics
 ----------------
@@ -48,17 +46,6 @@ EURIBOR3M_NOMINAL = 0.02524
 FINANCING_SPREADS = (0.005, 0.010)
 
 MAINTENANCE_RATIOS = (0.25, 0.30, 0.35)  # 25% ~ typical UCITS; 35% deliberately stressed
-REBALANCE_MONTHS = {"quarterly": 3, "annual": 12}
-
-# Named crisis windows (month-end), for the historical worst-episode report. The
-# dot-com window opens at the data start, so the book is already levered into the
-# fall -- its drawdown is the deepest partly for that start-date reason.
-CRISES = {
-    "2001-03 dot-com": ("2001-01", "2003-03"),
-    "2008 GFC": ("2007-10", "2009-02"),
-    "2020 Covid": ("2020-01", "2020-04"),
-    "2022 reflation": ("2021-12", "2022-10"),
-}
 
 # Daily crisis windows. The daily window starts 2002-07 (IEF), so the GFC, Covid
 # and 2022 are fully covered; the dot-com bear is caught only in its final months.
@@ -101,7 +88,7 @@ def simulate_path(
     m: float,
     f_annual: float,
     rebalance_period: int,
-    periods_per_year: int = 12,
+    periods_per_year: int = DAILY_PER_YEAR,
 ) -> PathResult:
     """Run the levered book through ``returns`` and track the margin ratio.
 
@@ -167,8 +154,8 @@ def historical_grid(
     *,
     maintenance=MAINTENANCE_RATIOS,
     spreads=FINANCING_SPREADS,
-    rebalances=REBALANCE_MONTHS,
-    periods_per_year: int = 12,
+    rebalances=DAILY_REBALANCE,
+    periods_per_year: int = DAILY_PER_YEAR,
 ) -> pd.DataFrame:
     """Run the actual historical path across the (m, spread, rebalance) grid."""
     rows = []
@@ -209,8 +196,8 @@ def crisis_report(
     f_annual: float,
     rebalance_period: int,
     *,
-    crises=CRISES,
-    periods_per_year: int = 12,
+    crises=DAILY_CRISES,
+    periods_per_year: int = DAILY_PER_YEAR,
 ) -> pd.DataFrame:
     """Per-crisis levered drawdown and lowest margin ratio.
 
@@ -276,13 +263,13 @@ def bootstrap_grid(
     *,
     horizon_years: int = 30,
     n_paths: int = 2000,
-    block: int = 12,
+    block: int = 63,
     bootstrap: str = "block",
     seed: int = 12345,
     maintenance=MAINTENANCE_RATIOS,
     spreads=FINANCING_SPREADS,
-    rebalances=REBALANCE_MONTHS,
-    periods_per_year: int = 12,
+    rebalances=DAILY_REBALANCE,
+    periods_per_year: int = DAILY_PER_YEAR,
 ) -> pd.DataFrame:
     """Bootstrap ``n_paths`` horizon-year paths; tabulate call/drawdown risk.
 

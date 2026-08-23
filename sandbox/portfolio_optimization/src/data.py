@@ -71,9 +71,7 @@ FRED_EUR_ON_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=IRSTCI01EZ
 FRED_EUR_ON_RAW = DATA_DIR / "fred_IRSTCI01EZM156N_2026-08-08.csv"
 
 SG_CTA_RAW = DATA_DIR / "sg_cta_index_2026-07-25.xls"
-ECB_EURUSD_URL = (
-    "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
-)
+ECB_EURUSD_URL = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
 EURUSD_RAW = DATA_DIR / "ecb_eurusd_daily_2026-08-04.json"
 
 
@@ -155,7 +153,7 @@ def download_ief(dest: Path = IEF_RAW) -> Path:
     adjclose = result["indicators"]["adjclose"][0]["adjclose"]
     records = [
         {"date": dt.datetime.fromtimestamp(t, dt.UTC).strftime("%Y-%m-%d"), "value": v}
-        for t, v in zip(timestamps, adjclose)
+        for t, v in zip(timestamps, adjclose, strict=True)
         if v is not None
     ]
     dest.write_text(json.dumps(records))
@@ -275,9 +273,7 @@ def load_sg_cta_usd_levels(raw_path: Path = SG_CTA_RAW) -> pd.Series:
     ).sort_index()
 
 
-def load_trend_eur_levels(
-    cta_path: Path = SG_CTA_RAW, eurusd_path: Path = EURUSD_RAW
-) -> pd.Series:
+def load_trend_eur_levels(cta_path: Path = SG_CTA_RAW, eurusd_path: Path = EURUSD_RAW) -> pd.Series:
     """Month-end trend levels in EUR: USD SG CTA Index level divided by EURUSD.
 
     Both series are resampled to month-end (the SG CTA USD level and the ECB

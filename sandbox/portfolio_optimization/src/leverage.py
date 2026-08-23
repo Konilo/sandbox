@@ -1,21 +1,17 @@
-"""Leverage (pass 5): scale the risky portfolio to the CRRA-optimal risk.
+"""Leverage: scale the risky portfolio to the CRRA-optimal risk.
 
-With the box-spread borrowing rate ``BOX_REAL`` (``mu.BOX_REAL``) and a chosen
-risky portfolio of *excess* Sharpe ``S = (mu_p - BOX_REAL) / sigma`` and
-volatility ``sigma``, a CRRA investor with risk aversion ``gamma`` holds a
-fraction
+For a risky book of *excess* Sharpe ``S = (mu_p - BOX_REAL) / sigma`` over the
+box borrowing rate and volatility ``sigma``, a CRRA investor with risk aversion
+``gamma`` holds
 
     k* = S / (gamma * sigma)
 
-of wealth in the risky portfolio (borrowing the rest at ``BOX_REAL``). That
-implies a target volatility ``sigma* = k* * sigma = S / gamma`` and an expected
-real return ``BOX_REAL + S**2 / gamma``. ``k* > 1`` is gross leverage, financed
-by short box spreads at ~``BOX_REAL``. The tangency itself is struck at the
-risk-free ``RF_REAL`` (composition); the leverage excess is measured over the
-higher ``BOX_REAL``.
-
-These are the *unconstrained* optima; a separate, practical cap on achievable
-leverage (portfolio margin, box-spread capacity) is applied downstream.
+of wealth in it (borrowing the rest), implying target volatility
+``sigma* = S / gamma`` and expected real return ``BOX_REAL + S**2 / gamma``.
+``k* > 1`` is gross leverage financed by short box spreads at ``BOX_REAL``; the
+tangency itself is struck at the lower cash rate ``RF_REAL`` (composition.py),
+so the leverage excess is measured over ``BOX_REAL``, not ``RF_REAL``. These are
+the unconstrained optima.
 """
 
 from __future__ import annotations
@@ -30,7 +26,7 @@ GAMMA = 2.0
 def optimal_leverage(sharpe: float, sigma: float, gamma: float = GAMMA) -> float:
     """CRRA-optimal gross exposure ``k* = S / (gamma * sigma)``.
 
-    ``sharpe`` is the *excess* Sharpe over the real financing rate ``RF_REAL``.
+    ``sharpe`` is the excess Sharpe over the box borrowing rate ``BOX_REAL``.
     """
     return sharpe / (gamma * sigma)
 
@@ -40,9 +36,7 @@ def target_volatility(sharpe: float, gamma: float = GAMMA) -> float:
     return sharpe / gamma
 
 
-def levered_expected_return(
-    sharpe: float, gamma: float = GAMMA, rf: float = BOX_REAL
-) -> float:
+def levered_expected_return(sharpe: float, gamma: float = GAMMA, rf: float = BOX_REAL) -> float:
     """Expected real return of the levered book, ``rf + S**2 / gamma``.
 
     ``sharpe`` is the *excess* Sharpe over ``rf``; ``rf`` defaults to the box

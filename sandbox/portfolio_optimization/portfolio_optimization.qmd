@@ -5,6 +5,7 @@ date: "2026-07-24"
 date-modified: "2026-07-25"
 execute:
     echo: false
+    freeze: true
 jupyter: python3
 ---
 

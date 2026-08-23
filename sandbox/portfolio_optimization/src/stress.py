@@ -23,7 +23,7 @@ rebalance the book is reset to the target ``k`` and weights.
 
 NOMINAL by construction: a margin call is a nominal accounting event and the
 sleeve series are nominal index returns, so the loan accrues at a *nominal*
-financing rate (``ESTR_NOMINAL`` + spread), not the study's real ``RF_REAL``.
+financing rate (``EURIBOR3M_NOMINAL`` + spread), not the study's real ``BOX_REAL``.
 The margin ratio is invariant to that choice anyway (a common deflator cancels
 in NAV/Gross), but nominal keeps returns and financing on the same footing.
 
@@ -40,10 +40,11 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-# Nominal financing base: the same ECB euro short-term rate that anchors the
-# study's real financing (RF_REAL), reference 2026-07-24. The box costs ~this at
-# its tenor; the sweep adds a spread on top (Cayas assumes +0.5%; +1% is severe).
-ESTR_NOMINAL = 0.02186
+# Nominal financing base: 3-month Euribor (2.524%, euribor-rates.eu, 2026-08-21),
+# the rate a rolled ~3-month box borrows at. The sweep adds the box spread on top
+# (Cayas's central case is +0.5%; +1% is a severe stress). Real equivalent is
+# mu.BOX_REAL.
+EURIBOR3M_NOMINAL = 0.02524
 FINANCING_SPREADS = (0.005, 0.010)
 
 MAINTENANCE_RATIOS = (0.25, 0.30, 0.35)  # 25% ~ typical UCITS; 35% deliberately stressed
@@ -175,18 +176,23 @@ def historical_grid(
         for spread in spreads:
             for m in maintenance:
                 res = simulate_path(
-                    returns, weights, k, m, ESTR_NOMINAL + spread, reb_period,
+                    returns,
+                    weights,
+                    k,
+                    m,
+                    EURIBOR3M_NOMINAL + spread,
+                    reb_period,
                     periods_per_year,
                 )
                 rows.append(
                     {
                         "rebalance": reb_name,
-                        "financing": f"€STR+{spread:.1%}",
-                        "m": f"{m:.0%}",
+                        "financing": f"Euribor3M+{spread:.1%}",
+                        "maintenance margin ratio": f"{m:.0%}",
                         "max drawdown": f"{res.max_drawdown:.0%}",
-                        "min cushion": f"{res.min_cushion:+.1%}",
-                        "call": "yes" if res.first_breach is not None else "no",
-                        "first call": (
+                        "min cushion ratio": f"{res.min_cushion:+.1%}",
+                        "liquidation": "yes" if res.first_breach is not None else "no",
+                        "first liquidation": (
                             "--"
                             if res.first_breach is None
                             else pd.Timestamp(res.first_breach).strftime("%Y-%m")
@@ -212,8 +218,7 @@ def crisis_report(
     threshold), so the reader compares the lowest ``rho`` directly against 25 /
     30 / 35 %. Drawdown is peak-to-trough within each window.
     """
-    res = simulate_path(returns, weights, k, 0.0, f_annual, rebalance_period,
-                        periods_per_year)
+    res = simulate_path(returns, weights, k, 0.0, f_annual, rebalance_period, periods_per_year)
     rows = []
     for name, (start, end) in crises.items():
         nav_w = res.nav.loc[start:end].to_numpy()
@@ -221,7 +226,7 @@ def crisis_report(
         rows.append(
             {
                 "crisis": name,
-                "levered drawdown": f"{max_drawdown(nav_w):.0%}",
+                "max drawdown": f"{max_drawdown(nav_w):.0%}",
                 "lowest margin ratio": f"{rho_w.min():.1%}",
             }
         )
@@ -301,7 +306,12 @@ def bootstrap_grid(
             dds = np.empty(n_paths)
             for i, path in enumerate(paths):
                 res = simulate_path(
-                    path, weights, k, 0.0, ESTR_NOMINAL + spread, reb_period,
+                    path,
+                    weights,
+                    k,
+                    0.0,
+                    EURIBOR3M_NOMINAL + spread,
+                    reb_period,
                     periods_per_year,
                 )
                 min_rho[i] = res.ratio.min()
@@ -310,11 +320,11 @@ def bootstrap_grid(
                 rows.append(
                     {
                         "rebalance": reb_name,
-                        "financing": f"€STR+{spread:.1%}",
-                        "m": f"{m:.0%}",
-                        "P(call) 30y": f"{(min_rho < m).mean():.0%}",
-                        "DD (median)": f"{np.median(dds):.0%}",
-                        "DD (5th pct)": f"{np.percentile(dds, 5):.0%}",
+                        "financing": f"Euribor3M+{spread:.1%}",
+                        "margin maintenance ratio": f"{m:.0%}",
+                        "P(liquidation) over 30 y": f"{(min_rho < m).mean():.0%}",
+                        "median drawdown": f"{np.median(dds):.0%}",
+                        "5th percentile drawdown": f"{np.percentile(dds, 5):.0%}",
                     }
                 )
     return pd.DataFrame(rows)

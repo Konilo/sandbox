@@ -23,9 +23,11 @@ external equity premium: delta = EQUITY_ERP / cov(equity, market), so the
 market-implied equity return equals the sourced ERP and every other sleeve's
 prior follows from its covariance with the market (no bond or gold premium is
 assumed). The ERP is an INDEPENDENT external number (not Konilo's own views --
-that would be circular), triangulated arithmetic / over-bills / world: DMS-2026
-forward ~4.5-5%, Damodaran implied 4.23%, Kroll 5.0%, Fernandez-2026 survey
-5.5% -> ~5.0%. This gives delta ~= 3.6.
+that would be circular). The forward-looking estimates cluster near 5%: Damodaran
+implied (US) 4.23%, Kroll (US) 5.0%, Fernandez-2026 survey 5.5% (mean ~4.9%); the
+DMS-2026 yearbook anchors the magnitude with the long-run realized premium over
+bills (US 6.6% vs 0.5% real). 5.0% is a round number at the centre of that range,
+not a like-for-like average.
 
 Views (absolute, real) are Konilo's honest from-source estimates (mu.VIEWS_REAL):
 equity 4.03% (Elm P-CAEY), bonds 1.0% (US Tsy YTM, EUR-hedged), trend 2.70% (forward).
@@ -70,7 +72,7 @@ def market_delta(cov: pd.DataFrame) -> float:
     delta is chosen so the market-implied (equilibrium) excess return on equity
     equals the external equity risk premium: ``delta = EQUITY_ERP / cov(equity,
     market)``. Every other sleeve's prior then follows from its covariance with
-    the market -- no separate bond or gold premium is assumed. Equity is ~69% of
+    the market -- no separate bond or gold premium is assumed. Equity is ~73% of
     the market and the only sleeve with a well-identified premium, which is why
     the market's risk aversion is anchored to it.
     """

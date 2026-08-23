@@ -55,7 +55,7 @@ ax.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-I am designing this strategy to be implemented in an [Interactive Brokers (IBKR) *compte-titre ordinaire* (CTO)](https://www.interactivebrokers.ie/en/accounts/individual.php?menu=B) as a French citizen. This choice implies that I would have access to a wide array of instruments.
+I am designing this strategy to be implemented in an [Interactive Brokers (IBKR) *compte-titre ordinaire* (CTO)](https://www.interactivebrokers.ie/en/accounts/individual.php?menu=B) as a French citizen. This broker and this type of account give access to a wide array of instruments and services.
 
 I have already defined the universe of assets I will consider and submit to the optimization (all EUR-denominated):
 
@@ -70,24 +70,25 @@ An IBKR CTO allows the implementation of short box spreads for fixed-rate, low-c
 
 Analytical process:
 
-- I will first define the inputs of the optimizer -- the assets' expected return, volatility and correlation. This step is very challenging, hence, I will employ techniques designed to keep those estimates humble and as evidence-based as possible.
-- I will then run mean-variance optimization (MVO) on those inputs to identify the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio), as per the modern portfolio theory. MVO being theoretically exact but practically very sensitive to the fraction of error in the inputs, I will correct this result by tilting the assets' weights toward a conservative anchor.
-- I will then solve for the amount of leverage to apply to this optimized portfolio to maximize utility. The challenge is to estimate the portfolio of assets that will maximize the expected return per unit of risk taken, and then leverage it to the level of risk that best suits my psychology (@eq-challenge).
-- But because unconstrained, utility-maximizing leveraging ignores the risk of forced liquidation (given IBKR's margin requirements), I will cap it at the level that keeps that risk low enough and check whether, once leverage is constrained, the optimal composition shifts away from the tangency.
+- I will first define the inputs of the optimizer -- the assets' expected return, volatility and correlation. The rest of the analysis is extremely sensitive to those inputs, hence, I will employ techniques designed to keep them as humble and evidence-based as possible.
+- I will then run mean-variance optimization (MVO) on those inputs to identify the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio), as per the modern portfolio theory.
+- I will then solve for the amount of leverage to apply to this optimized portfolio to maximize utility. In summary, the challenge so far consists in (i) estimating the portfolio of assets that will maximize the expected return per unit of risk taken, and then (ii) leverage it to the level of risk that best suits my psychology (@eq-challenge).
 
 $$
 \underbrace{\frac{\text{return}}{\text{risk}}}_{\text{to maximize}} \times \underbrace{\text{leverage}}_{\substack{\text{to adapt to my} \\ \text{risk aversion level}}}
 $$ {#eq-challenge}
 
+- Finally, I will stress test the levered portfolio out of sample, regarding the risk of forced liquidation^[IBKR does not use margin calls, they liquidate directly.].
+
 
 # Historical returns
 
-Historical returns are important, but not sufficient, factors in the determination of the MVO inputs. They are estimated from long-history proxies of the actual ETFs I would invest in because those ETFs are too recent. Return time series are monthly and denominated in EUR.
+Historical returns are important (but not sufficient) factors in the determination of the MVO inputs. They are estimated from long-history proxies of the actual ETFs I would invest in because those ETFs are too recent. Return time series are monthly and denominated in EUR.
 
 | Sleeve | Proxy | Currency handling | Native time range | Source |
 |---|---|---|---|---|
 | Equity | MSCI ACWI Standard (Large+Mid), Net | EUR (native) | 2001-01 to 2026-06 | [MSCI](https://app2.msci.com/products/index-data-search/regional_chart.jsp?asOf=24/Jul/2026&size=Standard%20(Large%2BMid%20Cap)&scope=R&style=None&currency=EUR&priceLevel=NETR&indexId=892400&indexName=ACWI&suite=C) |
-| Bonds | ICE US Treasury 7-10y, via IEF | USD (native), EUR-hedged via 1-month carry | 2002-07 to 2026-08 | [iShares](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf) (IEF), [FRED](https://fred.stlouisfed.org/series/DGS1MO) (hedge carry) |
+| Bonds | ICE US Treasury 7-10 y, via IEF | USD (native), EUR-hedged via 1-month carry | 2002-07 to 2026-08 | [iShares](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf) (IEF), [FRED](https://fred.stlouisfed.org/series/DGS1MO) (hedge carry) |
 | Trend | SG CTA Index, net-of-fee | USD (native) converted to EUR, unhedged | 2000-01 to 2026-07 | [SG Prime Services](https://wholesale.banking.societegenerale.com/en/prime-services-indices/) (index), [ECB](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html) (EUR/USD) |
 | Gold | LBMA PM gold fix | EUR (native) | 1999-02 to 2026-07 | [LBMA](https://prices.lbma.org.uk/json/gold_pm.json) |
 : Return time series used as proxies for the study {#tbl-data}
@@ -121,9 +122,11 @@ n_months = len(returns)
 n_years = round(n_months / 12)
 ```
 
+I had to reconstruct the EUR hedging component of my bonds sleeve proxy data. My target vehicle is a EUR-hedged UCITS ETF on the ICE US Treasury 7-10 y index, but this type of instrument is too recent for a long study, so I (i) proxy the underlying with [IEF](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf) -- a US ETF on the same index -- and (ii) simulate the EUR hedge. Hedging is simulated by assuming a rolling one-month currency forward contract was held on the index's full market value, as per [ICE Bond Index Methodologies](https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf), pp. 22-23; I don't have that forward series, but [covered interest parity](https://en.wikipedia.org/wiki/Interest_rate_parity) ties its cost to the short-rate differential between the two legs of the currency forward (EUR & USD), so I add the one-month carry from [FRED](https://fred.stlouisfed.org/series/DGS1MO) short rates (the euro overnight rate minus the 1-month US T-bill). The resulting time series has a ~0.99 correlation with live hedged ETFs (7USH from 2023, CEMF from 2025).
+
 The SG CTA Index is the live, net-of-fee return of a [pool of the largest managed-futures CTAs](https://wholesale.banking.societegenerale.com/fileadmin/indices_feeds/SG_CTA_Index_Constituents.pdf). It is a good proxy for DBMFE (which uses it as its benchmark). DBMFE is an unhedged, EUR-denominated share class, so I simply convert the USD index to EUR and leave it unhedged.
 
-The resulting cross-sectionally-complete time frame is `{python} data_start` to `{python} data_end` (~`{python} n_years` years, `{python} n_months` months). It spans the tail of the dot-com bear, the GFC, the Covid crisis, and the 2022 stock–bond correlation sign flip.
+The resulting cross-sectionally-complete time frame is `{python} data_start` to `{python} data_end` (~`{python} n_years` years, `{python} n_months` months). It spans the tail of the dot-com bear, the GFC, the Covid crisis, and the 2022 inflationnary crisis & stock–bond correlation sign flip.
 
 @tbl-data-vol shows the annualized volatilities of each sleeve.
 ```{python}
@@ -132,7 +135,7 @@ The resulting cross-sectionally-complete time frame is `{python} data_start` to 
 pd.DataFrame({"Annualized volatility": (returns.std() * 12**0.5).map("{:.1%}".format)})
 ```
 
-The numbers above are full-period averages that hide large regime shifts. For bonds it is rate-driven: with the currency hedged out, the sleeve carries only the rate volatility of 7-10y Treasuries, which was subdued through the low-rate 2010s and rose after 2020 as rate volatility returned (@fig-rolling-vol). @fig-rolling-vol shows each sleeve's 36-month rolling annualized volatility.
+The numbers above are full-period averages that hide large regime shifts.@fig-rolling-vol shows each sleeve's 36-month rolling annualized volatility.
 
 ```{python}
 #| label: fig-rolling-vol
@@ -186,8 +189,7 @@ off_diagonal = ~np.eye(len(sample_corr), dtype=bool)
 avg_corr_fmt = f"{sample_corr.values[off_diagonal].mean():.2f}"
 ```
 
-The sample of historical returns allows us to compute a covariance matrix. But, as per Ledoit & Wolf ([2003](http://www.ledoit.net/honey.pdf)), "nobody should be using the sample
-covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} lw_delta_fmt` by the Ledoit-Wolf estimator^[The problem targetted by Ledoit & Wolf is most important in cases where the number of assets surpasses the number of observations in each return time series which is far from our case, but I apply that method for robustness.]. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage).
+The sample of historical returns allows us to compute a covariance matrix. But, as per Ledoit & Wolf ([2003](http://www.ledoit.net/honey.pdf)), "nobody should be using the sample covariance matrix for the purpose of portfolio optimization" because of its estimation error. As such, our sample covariance matrix is shrunk toward a constant-correlation target with the optimal shrinkage constant $\delta$ set to `{python} lw_delta_fmt` by the Ledoit-Wolf estimator^[The problem targetted by Ledoit & Wolf is most important in cases where the number of assets surpasses the number of observations in each return time series which is far from our case, but I apply that method for robustness.]. That results in each pair-wise correlation coefficient to be pulled toward the average sample pair-wise correlation coefficient (@tbl-shrinkage).
 
 ```{python}
 #| label: tbl-shrinkage
@@ -205,14 +207,14 @@ for _i in _shrunk.index:
 mask_upper(_cells)
 ```
 
-The shifts shown in parentheses in @tbl-shrinkage are small, so that the pull toward the `{python} avg_corr_fmt` average correlation is mild.
+The shifts shown in parentheses in @tbl-shrinkage are small, so the pull toward the `{python} avg_corr_fmt` average correlation is mild.
 
 
 ### Regime inspection
 
 The correlations above -- sample or shrunk -- are full-period averages.
 They hide the evolution of the degree of comovement over time between the sleeve proxies.
-To be more specific, I want equities to be un- or anticorrelated relative to the other sleeves when equities crash. An average correlation doesn't provide enough time granularity to examine this.
+I want equities to be anticorrelated to the other sleeves when equities crash. An average correlation doesn't provide enough time granularity to examine this.
 So it is important that we scrutinize those single numbers before feeding them to MVO. In @tbl-regime-corr, I bucket the `{python} n_months` months of data by the sign of their equity return and compute each sleeve's correlation with equity within each bucket.
 
 ```{python}
@@ -273,22 +275,20 @@ plt.show()
 
 ### The final covariance
 
-The regime inspection flags one correlation to scrutinise: the equity-bonds one. For the EUR-hedged US Treasury sleeve it is genuinely negative -- a structural, rates-driven flight-to-quality decorrelation, and the very property the sleeve was chosen for (@tbl-regime-corr): hedged Treasuries rallied while equities fell through the GFC and Covid. It is not an all-weather hedge, though: it turned positive in the 2022 inflation shock, when bonds and equities fell together, and the rolling correlation was still elevated at the sample end (@fig-rolling-corr).
+The regime inspection highlights one correlation to scrutinize: the equity-bonds one. Our EUR-hedged US Treasury sleeve yields a genuinely negative correlation to equity, most times. That's a flight-to-quality phenomenon which is the main property this instrument was chosen for (@tbl-regime-corr): it rallied while equities fell through the GFC and Covid. It is not an all-weather hedge, though: the correlation turned positive since the 2022 inflationnary crisis and both our equities & bonds sleeves crashed together. The rolling correlation was still high at the end of the sample period (@fig-rolling-corr).
 
-An earlier, unhedged version of this study distrusted this pair and overrode it toward zero. I no longer do. That distrust fit a sleeve whose negative correlation rested on an unhedged dollar cushion that might not recur; the hedged sleeve's decorrelation is instead the rates flight-to-quality that is its raison d'être, so overriding it away would contradict the choice to hold it. Its one failure mode -- the inflation regime, where no government bond hedges equities -- is real, but covering it is the job of the gold and trend sleeves, not something I patch by distorting this input. I therefore feed MVO the Ledoit-Wolf-shrunk correlation directly (@tbl-final-corr); the shrinkage already pulls the raw estimate toward the cross-sleeve average, a principled temper in place of a hand-set number.
-
-The bond volatility is likewise left at its sample value (@tbl-final-vol): the EUR-hedged sleeve carries the rate volatility of 7-10y Treasuries with the currency stripped out, so there is nothing to correct.
+But I do not treat that negative sample correlation as a forward constant. Its sign is regime-dependent: negative during deflationnary shocks, positive during inflationnary crises (Campbell, Sunderam & Viceira, [2009](https://www.nber.org/papers/w14701)). The 2022 flip demonstrates the later case. Forward-looking capital-market assumptions place the equity-bonds correlation near zero and regime-unstable rather than reliably negative -- J.P. Morgan's [2026 LTCMA](https://am.jpmorgan.com/us/en/asset-management/institutional/insights/portfolio-insights/ltcma/) assumes ~0.02 for US equities versus Treasuries, Amundi treats cross-asset correlations as unstable ([2026](https://research-center.amundi.com/article/capital-market-assumptions-2026)), and PIMCO ([2024](https://www.pimco.com/us/en/insights/negative-correlations-positive-allocations)) finds it turns negative only when inflation sits near central-bank targets (i.e., when unexpected inflation is low). Therefore, I override the equity-bonds correlation to 0 (@tbl-final-corr). Bonds inflation-regime blind spot is left for gold and trend following to manage.
 
 The non-equity sleeves' crisis-hedging value is convex and state-dependent, which is an information a single covariance matrix cannot convey. Editing the correlations cannot capture it. MVO prices these sleeves on their average comovement, so it under-weights the tail protection they offer. This is a known limitation of any single-covariance optimizer, which I accept.
 
-What MVO is fed is the covariance matrix $\Sigma$: its diagonal holds the sleeve variances (the volatilities squared) and its off-diagonal entries are $\Sigma_{ij} = \sigma_i\,\sigma_j\,\rho_{ij}$. @tbl-final-corr and @tbl-final-vol decompose it into correlations and volatilities for legibility.
+What MVO is fed is the covariance matrix $\Sigma$: its diagonal holds the sleeve variances (the volatilities squared) and its off-diagonal entries are the coviarances ($\Sigma_{ij} = \sigma_i\,\sigma_j\,\rho_{ij}$). @tbl-final-corr and @tbl-final-vol decompose it into correlations and volatilities for legibility.
 
 ```{python}
 #| label: tbl-final-corr
-#| tbl-cap: "Final correlation matrix (Ledoit-Wolf-shrunk, used as-is)."
+#| tbl-cap: "Final correlation matrix (Ledoit-Wolf-shrunk; equity-bonds correlation overridden to 0)."
 from covariance import annualized_vols, final_covariance
 
-cov_final = final_covariance(returns)
+cov_final = final_covariance(returns, rho_equity_bonds=0.0)
 mask_upper(correlation(cov_final).map("{:.2f}".format))
 ```
 
@@ -319,7 +319,7 @@ $$
 
 the implied equilibrium returns (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)), where $w_\text{mkt}$ is the vector of market-capitalization weights. Adding the risk-free rate gives the expected return reported in @tbl-bl-prior.
 
-The weights $w_\text{mkt}$ are the market capitalizations normalized to sum to one, which treats the four sleeves as the whole market. They are not -- credit, real estate, cash and many other assets are excluded -- but computing the equilibrium over the investable universe rather than a literally global market portfolio is the standard Black-Litterman construction, in which the market is the set of assets under consideration (He & Litterman, [1999](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=334304); Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)). The prior is thus the CAPM-implied return within that universe. @tbl-bl-prior shows the capitalizations (in USD for data availability; only the ratios matter, so the currency is irrelevant), the implied weights, and the prior:
+The weights $w_\text{mkt}$ are the market capitalizations normalized to sum to one, which treats the four sleeves as the whole market. They are not -- credit, real estate, cash and many other assets are excluded -- but computing the equilibrium over the investable universe rather than a literally global market portfolio is the standard Black-Litterman construction, in which the market is the set of assets under consideration (He & Litterman, [1999](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=334304); Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)). The prior is thus the CAPM-implied return within that universe. @tbl-bl-prior shows the capitalizations (in USD for data availability but only the ratios matter, so the currency is irrelevant), the implied weights, and the prior:
 
 ```{python}
 #| label: tbl-bl-prior
@@ -334,6 +334,7 @@ bl_delta_fmt = f"{bl_delta:.1f}"
 cap_equity_fmt = f"{MARKET_CAPS['equity']:.0f}"
 cap_bonds_fmt = f"{MARKET_CAPS['bonds']:.0f}"
 cap_gold_fmt = f"{MARKET_CAPS['gold']:.0f}"
+eq_mktwt_fmt = f"{market_weights(cov_final.index)['equity']:.0%}"
 trend_vol = cov_final.loc["trend", "trend"] ** 0.5
 trend_sharpe = 0.2  # forward net Sharpe assigned to the trend sleeve
 trend_sharpe_fmt = f"{trend_sharpe:.1f}"
@@ -353,7 +354,7 @@ pd.DataFrame(
 
 The capitalizations are the MSCI ACWI free-float market cap (\$`{python} cap_equity_fmt` tn, [MSCI factsheet](https://www.msci.com/documents/10199/255599/msci-acwi-net.pdf), 2026), the US Treasury notes and bonds outstanding (\$`{python} cap_bonds_fmt` tn, [FiscalData MSPD](https://fiscaldata.treasury.gov/datasets/monthly-statement-public-debt/summary-of-treasury-securities-outstanding), 2026-07), and WGC financial gold (\$`{python} cap_gold_fmt` tn, [WGC](https://www.gold.org/goldhub/research/market-primer/gold-market-primer-market-size-and-structure), 2026). Managed futures don't have a market capitalization, so they take weight $0$ in the market portfolio. Their equilibrium prior is still not exactly zero, though: the market-implied return depends on each asset's covariance with the market (its $\beta$) rather than on its own weight, and managed futures' low $\beta$ puts them at near-zero prior. Their return therefore comes almost entirely from the view.
 
-The market's risk aversion, $\delta$, is computed based on a set of professional equity risk premium assumptions: I set $\delta$ so that the market-implied return on equity equals that premium, $\delta = \text{ERP} / \operatorname{cov}(\text{equity}, \text{market})$, and every other sleeve's implied return then follows from its covariance with the market -- no separate bond or gold premium is assumed. Equity is ~69 % of the market and the only sleeve with a well-identified premium, so anchoring $\delta$ to it keeps every input sourced. The premium is an external number, not my own equity view (which would make the prior a mirror of it): an arithmetic, over-bills, world equity premium triangulated across the [DMS/UBS 2026 Yearbook](https://www.ubs.com/content/dam/assets/wm/static/cio/documents/giry2026-summary-public.pdf), [Damodaran](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histimpl.html) (implied US 4.23 %), [Kroll](https://www.kroll.com/en/reports/cost-of-capital/recommended-us-equity-risk-premium-and-corresponding-risk-free-rates) (5.0 %) and the [Fernandez 2026 survey](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6570342) (5.5 %) lands at ~5.0 %. This gives $\delta \approx$ `{python} bl_delta_fmt`. $\delta$ scales the prior's level (and, downstream, the leverage) but not its weights.
+The market's risk aversion, $\delta$, is needed, in this process, to scale the prior $\Pi$ (and, downstream, the leverage). It is computed based on a set of professional equity risk premium (ERP) assumptions: I set $\delta$ so that the market-implied return on equity equals that premium, $\delta = \text{ERP} / \operatorname{cov}(\text{equity}, \text{market})$, and every other sleeve's implied return then follows from its covariance with the market. Equity is ~`{python} eq_mktwt_fmt` of the market and the only sleeve with a well-identified premium, so anchoring $\delta$ to it keeps every input sourced. The ERP is an external number, not my view on equity. The forward-looking estimates cluster near 5 %: [Damodaran](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histimpl.html) (implied US, 4.23 %), [Kroll](https://www.kroll.com/en/reports/cost-of-capital/recommended-us-equity-risk-premium-and-corresponding-risk-free-rates) (US, 5.0 %), and the [Fernandez 2026 survey](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6570342) (5.5 %), averaging ~4.9 %; the [DMS/UBS 2026 Yearbook](https://www.ubs.com/content/dam/assets/wm/static/cio/documents/giry2026-summary-public.pdf) anchors the magnitude with the long-run realized premium over bills (US equities 6.6 % vs bills 0.5 %, real, 1900-2025; lower for the world). I take 5.0 % as an arbitrary center point in that range. We land on $\delta \approx$ `{python} bl_delta_fmt`.
 
 
 ### My views
@@ -362,7 +363,7 @@ Each sleeve's view is an estimate (partly inspired by Ilmanen's ([2022](https://
 
 - **Bonds: ~1.0 % real, confidence 0.7.** The ICE US Treasury 7-10y index the sleeve tracks yields 4.60 % to maturity (nominal, USD; [iShares IEF](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf), 2026-08). Hedging to EUR gives up the USD-minus-EUR short-rate differential (covered interest parity) -- currently ~1.6 pp (US 1-month 3.78 %, [FRED](https://fred.stlouisfed.org/series/DGS1MO); €STR 2.19 %, [ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html)) -- leaving ~3.0 % hedged nominal; minus ~2 % expected inflation ([ECB SPF](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.0 % real. The starting yield is a strong forward predictor of the nominal return and the CAPM prior is a weak model for bonds, so I lean on the view.
 - **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at 4.03 % ([Elm Wealth](https://elmwealth.com/capital-market-assumptions/), 2026-07-27). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
-- **Trend: ~2.7 % real, confidence 0.65.** A lot of evidence backs the trend premium. It was positive over every decade since 1800 (Lempérière et al., [2014](https://doi.org/10.21314/JOIS.2014.043)), a diversified time-series-momentum Sharpe above 1 since 1966 (Moskowitz, Ooi & Pedersen, [2012](https://doi.org/10.1016/j.jfineco.2011.11.003)), and robust across a century net of fees (Hurst, Ooi & Pedersen, [2017](https://doi.org/10.3905/jpm.2017.44.1.015)). Its existence is well-established; its magnitude is not, though. Those studies' gross Sharpes of 0.7 to >1 come from stronger, less-crowded pre-2000 trends, while the live net-of-fee SG CTA Index I would track via DBMFE had a Sharpe of only ~0.13 over our sample period. I place my view between those bounds. The EUR-unhedged SG CTA that DBMFE benchmarks carries a ~`{python} trend_vol_fmt` volatility; I assign it a forward net Sharpe of `{python} trend_sharpe_fmt`. Its excess real return is then `{python} trend_sharpe_fmt` × `{python} trend_vol_fmt` ≈ `{python} trend_excess_fmt`, and adding the `{python} rf_real_fmt` real cash rate (cf. @sec-leverage) gives `{python} trend_return_fmt` real. The confidence is set below the ones of equity and bonds, and above what a noisy estimate would get, because the CAPM equilibrium prior is structurally unfit here: trend is an anomaly a single-factor model cannot price correctly which penalizes managed futures given their low beta.
+- **Trend: ~2.7 % real, confidence 0.65.** A lot of evidence backs the trend premium. It was positive over every decade since 1800 (Lempérière et al., [2014](https://doi.org/10.21314/JOIS.2014.043)), a diversified time-series-momentum Sharpe above 1 since 1966 (Moskowitz, Ooi & Pedersen, [2012](https://doi.org/10.1016/j.jfineco.2011.11.003)), and robust across a century net of fees (Hurst, Ooi & Pedersen, [2017](https://doi.org/10.3905/jpm.2017.44.1.015)). Its existence is well-established. Its magnitude is not, though. Those studies' gross Sharpes of 0.7 to >1 come from stronger, less-crowded pre-2000 trends, while the live net-of-fee DBMFE I proxy with the SG CTA Index had a Sharpe of only ~0.13 over our sample period. I place my view between those bounds. The EUR-unhedged SG CTA that DBMFE benchmarks carries a ~`{python} trend_vol_fmt` volatility; I assign it a forward net Sharpe of `{python} trend_sharpe_fmt`. Its excess real return is then `{python} trend_sharpe_fmt` $\times$ `{python} trend_vol_fmt` $\approx$ `{python} trend_excess_fmt`, and adding the `{python} rf_real_fmt` real risk-free cash rate (the collateral yield $R_F$, not the box borrowing rate; cf. @sec-leverage) gives `{python} trend_return_fmt` real. The confidence is set below the ones of equity and bonds, and above what a noisy estimate would get, because the CAPM equilibrium prior is structurally unfit here: trend is an anomaly a single-factor model cannot price correctly which penalizes managed futures given their low beta.
 - **Gold: no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation according to Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198))), so I express nothing and leave gold at its equilibrium prior.
 
 
@@ -394,9 +395,9 @@ This posterior is the MVO input. The posterior equity return is not far from my 
 
 # Determining the portfolio weights
 
-MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, and outputs the weights of the max-Sharpe portfolio also called the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio) (@tbl-tangency). The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem#One_risk-free_asset) can then be applied: since borrowing is allowed via short box spreads, any investor's portfolio converges to using the tangency portfolio weights, and scales it using leverage to their own risk aversion level (more on that in the next section; remember @eq-challenge?).
+MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, and outputs the weights of the max-Sharpe portfolio also called the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio) (@tbl-tangency). The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem#One_risk-free_asset) can then be applied: since borrowing is allowed (via short box spreads), any investor's portfolio converges to using the tangency portfolio weights, and scales it using leverage to their own risk aversion level (more on that in the next section; remember @eq-challenge?).
 
-@tbl-mvo-inputs first consolidates what the optimiser sees per sleeve -- posterior excess return, volatility, Sharpe, and correlation with equity -- next to the weight each receives.
+@tbl-mvo-inputs shows what the optimizer sees per sleeve next to the resulting weights.
 
 ```{python}
 #| label: tbl-mvo-inputs
@@ -410,7 +411,7 @@ pd.DataFrame(
     {
         "posterior μ": bl_post.map("{:.2%}".format),
         "excess (μ − RF)": (bl_post - RF_REAL).map("{:.2%}".format),
-        "ann vol σ": _vols.map("{:.1%}".format),
+        "ann. vol. σ": _vols.map("{:.1%}".format),
         "Sharpe": ((bl_post - RF_REAL) / _vols).map("{:.2f}".format),
         "corr w/ equity": correlation(cov_final)["equity"].map("{:.2f}".format),
         "tangency weight": _w.map("{:.1%}".format),
@@ -432,13 +433,44 @@ w_equity_fmt = f"{w_risky['equity']:.0%}"
 w_bonds_fmt = f"{w_risky['bonds']:.0%}"
 w_trend_fmt = f"{w_risky['trend']:.0%}"
 w_gold_fmt = f"{w_risky['gold']:.0%}"
+from mu import BOX_REAL
+box_fmt = f"{BOX_REAL:.2%}"
 pd.DataFrame([_row]).style.hide(axis="index")
 ```
 
 
 # Applying leverage {#sec-leverage}
 
-The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk I should bear given its Sharpe. Financing at a real rate $R_F$ -- my box-spread cost, ~0.19 % real^[Box spreads finance at ~the EUR risk-free curve at their tenor. Rolling quarterly, that tenor is ~3 months, well approximated by the overnight €STR of 2.19 % ([ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), 2026-07-24); minus ~2 % expected inflation gives ~0.19 % real. The truest figure is the implied rate of my own box fills each quarter -- this is the ex-ante proxy.] -- a CRRA investor with risk aversion $\gamma$ holds a fraction $k^* = S / (\gamma\,\sigma)$ of wealth in the tangency portfolio, where $S = (\mu_p - R_F)/\sigma$ is its excess Sharpe and $\sigma$ its volatility. That implies a target volatility $\sigma^* = S/\gamma$ and an expected real return $R_F + S^2/\gamma$; $k^* > 1$ is gross leverage, financed by short box spreads at ~$R_F$.
+The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk level I should bear, given its Sharpe, to maximize utility, so I borrow to lever it up. I finance that borrowing with short box spreads at $R_B \approx$ `{python} box_fmt` real -- 3-month Euribor (2.524 %, [2026-08-21](https://www.euribor-rates.eu/en/current-euribor-rates/2/euribor-rate-3-months/)) plus 0.5 % (as per the [Cayas](https://cayas.fr/le-journal/msci-world-assurance-vie-pilotee-allocation-cayas-meilleure)), minus ~2 % expected inflation.
+
+The optimal leverage ratio is solved the [Merton portfolio problem](https://en.wikipedia.org/wiki/Merton's_portfolio_problem). For the CRRA utility of the introduction, a single risky asset of expected return $\mu$ and volatility $\sigma$, and lending/borrowing at a risk-free rate $r$, Merton's solution is a constant optimal fraction of wealth in the risky asset,
+
+$$
+w^* = \frac{\mu - r}{\gamma\,\sigma^2}
+$$
+
+My risky asset is the tangency portfolio presented earlier -- expected return $\mu_p$, volatility $\sigma$ -- and I borrow to lever it at the box rate $R_B$, so its optimal weight is as follows (just by remapping the variables)
+
+$$
+k^* = \frac{\mu_p - R_B}{\gamma\,\sigma^2}
+$$
+
+Let $S = (\mu_p - R_B)/\sigma$ be the tangency's excess return per unit of risk over the borrowing rate (marginally below its risk-free Sharpe in @tbl-tangency, since $R_B > R_F$), so $\mu_p - R_B = S\sigma$. Substituting, we get
+
+$$
+k^* = \frac{S\sigma}{\gamma\,\sigma^2} = \frac{S}{\gamma\,\sigma}
+$$
+
+The utility-maximizing portfolio has a $k^*$ weight on (i.e., exposition to) the tangency portfolio and $1 - k^*$ on cash (a negative value here represents borrowing, cf. @tbl-leverage). Its volatility and expected real return are derived as follows:
+
+$$
+\begin{aligned}
+\sigma^* &= k^*\sigma = \frac{S}{\gamma} \\
+\mathbb{E}[r] &= R_B + k^*(\mu_p - R_B) = R_B + \frac{S^2}{\gamma}
+\end{aligned}
+$$
+
+the last step using $k^*(\mu_p - R_B) = \tfrac{S}{\gamma\sigma} \times S\sigma = S^2/\gamma$.
 
 ```{python}
 #| label: leverage-calc
@@ -451,13 +483,16 @@ from leverage import (
     target_volatility,
 )
 
-k = optimal_leverage(sh_risky, s_risky, GAMMA)
+from mu import BOX_REAL
+
+sh_box = (r_risky - BOX_REAL) / s_risky  # tangency excess over the box borrowing rate
+k = optimal_leverage(sh_box, s_risky, GAMMA)
 k_fmt = f"{k:.2f}:1"
-sstar_fmt = f"{target_volatility(sh_risky, GAMMA):.1%}"
-erlev_fmt = f"{levered_expected_return(sh_risky, GAMMA):.1%}"
+sstar_fmt = f"{target_volatility(sh_box, GAMMA):.1%}"
+erlev_fmt = f"{levered_expected_return(sh_box, GAMMA, rf=BOX_REAL):.1%}"
 ```
 
-At $\gamma = 2$ that is a gross exposure of `{python} k_fmt`, a target volatility of `{python} sstar_fmt`, and an expected real return of `{python} erlev_fmt`. @tbl-leverage shows the resulting book as fractions of NAV: the financing leg (`borrowed cash`) is the box-spread borrowing.
+For $\gamma = 2$ we get a leverage ratio of `{python} k_fmt`, a target annualized volatility of `{python} sstar_fmt`, and an expected real return of `{python} erlev_fmt`. @tbl-leverage shows the resulting portfolio.
 
 ```{python}
 #| label: tbl-leverage
@@ -467,7 +502,9 @@ pd.DataFrame(
 ).rename_axis("position").reset_index().style.hide(axis="index")
 ```
 
-The resulting $k^*$ is `{python} k_fmt`. But this is the unconstrained optimum, and a practical cap (portfolio margin, box-spread capacity) may bind below $k^*$ and would tilt the book away from the low-vol sleeves. The real financing rate above already trims $k^*$; any box-spread spread over the risk-free would trim it a little more. @tbl-leverage-gamma shows the sensitivity to $\gamma$.
+But that resulting $k^*$ (`{python} k_fmt`) is the unconstrained optimum. Whether margin requirements bring the maximum safe leverage ratio below $k^*$ is what the stress test (@sec-stress) checks.
+
+@tbl-leverage-gamma shows the sensitivity to $\gamma$.
 
 ```{python}
 #| label: tbl-leverage-gamma
@@ -475,15 +512,15 @@ The resulting $k^*$ is `{python} k_fmt`. But this is the unconstrained optimum, 
 rows = {}
 for g in [1.5, 2.0, 2.5, 3.0]:
     rows[g] = {
-        "k* (leverage)": f"{optimal_leverage(sh_risky, s_risky, g):.2f}:1",
-        "σ* (target vol)": f"{target_volatility(sh_risky, g):.1%}",
-        "E[r] real": f"{levered_expected_return(sh_risky, g):.1%}",
+        "k* (leverage)": f"{optimal_leverage(sh_box, s_risky, g):.2f}:1",
+        "σ* (target vol)": f"{target_volatility(sh_box, g):.1%}",
+        "E[r] real": f"{levered_expected_return(sh_box, g, rf=BOX_REAL):.1%}",
     }
 pd.DataFrame(rows).T.rename_axis("γ").reset_index().style.hide(axis="index").format(precision=1)
 ```
 
 
-# Margin-call stress test {#sec-stress}
+# Forced liquidation stress test {#sec-stress}
 
 ```{python}
 #| label: stress-setup
@@ -493,10 +530,8 @@ from data import daily_returns_matrix
 
 returns_daily = daily_returns_matrix()
 daily_start = f"{returns_daily.index.min():%Y-%m}"
-daily_f = stress.ESTR_NOMINAL + 0.005  # base case: €STR + 0.5 %
-daily_path = stress.simulate_path(
-    returns_daily, w_risky, k, 0.0, daily_f, 63, periods_per_year=252
-)
+daily_f = stress.EURIBOR3M_NOMINAL + 0.005  # base case: Euribor 3M + 0.5 %
+daily_path = stress.simulate_path(returns_daily, w_risky, k, 0.0, daily_f, 63, periods_per_year=252)
 rho0_fmt = f"{1 / k:.1%}"
 kstar_fmt = f"{k:.2f}"
 daily_min_rho_fmt = f"{daily_path.ratio.min():.1%}"
@@ -505,48 +540,85 @@ covid_rho_fmt = f"{daily_path.ratio.loc['2020-02':'2020-04'].min():.1%}"
 
 # One daily bootstrap, reused for the table (@tbl-stress-boot) and the prose below.
 _boot = stress.bootstrap_grid(
-    returns_daily, w_risky, k, spreads=(0.005,), rebalances=stress.DAILY_REBALANCE,
-    bootstrap="stationary", block=63, periods_per_year=252, n_paths=2000,
+    returns_daily,
+    w_risky,
+    k,
+    spreads=(0.005,),
+    rebalances=stress.DAILY_REBALANCE,
+    bootstrap="stationary",
+    block=63,
+    periods_per_year=252,
+    n_paths=2000,
 )
-_q25 = _boot[(_boot["rebalance"] == "quarterly") & (_boot["m"] == "25%")].iloc[0]
-pcall25_fmt = _q25["P(call) 30y"]
-dd_med_fmt = _q25["DD (median)"].lstrip("-")
-dd_p5_fmt = _q25["DD (5th pct)"].lstrip("-")
+_q25 = _boot[
+    (_boot["rebalance"] == "quarterly") & (_boot["margin maintenance ratio"] == "25%")
+].iloc[0]
+pcall25_fmt = _q25["P(liquidation) over 30 y"]
+dd_med_fmt = _q25["median drawdown"].lstrip("-")
+dd_p5_fmt = _q25["5th percentile drawdown"].lstrip("-")
 ```
 
-The leverage above follows from my risk aversion; this section answers the separate question any levered strategy must face -- what is the drawdown and margin-call risk -- and answers it out of sample, by pushing the chosen book through history and through bootstrapped paths it was never fit to.
+The above leverage ratio's optimality with respect to my risk aversion level is solved. At the same time, the resulting leveraged portfolio also needs to be safe regarding forced liquidation by IBKR. To examine that risk, this section will run the portfolio (i) through our history of returns and (ii) through bootstrapped paths.
 
-A margin call here is specific. Box-spread financing is a fixed-term loan: the lender cannot pull it or reprice it mid-crisis, which is its advantage over a margin loan. But the borrowed cash buys marked-to-market ETFs, and Interactive Brokers still liquidates if account equity falls below the maintenance requirement on those longs. Normalising net asset value to 1 at gross leverage $k$, with gross book $G_t = \sum_i P_{i,t}$, a loan $L_t$ that accrues the financing rate, and $NAV_t = G_t - L_t$, the margin ratio is $\rho_t = NAV_t / G_t$ and a call fires when $\rho_t < m$, the maintenance ratio. The book starts at $\rho_0 = 1/k =$ `{python} rho0_fmt`.
+A short box spread is a fixed-term, fixed-rate loan. But the borrowed cash is invested in marked-to-market ETFs, and IBKR still liquidates if the account's equity (i.e., NAV) falls below the maintenance margin (even though no margin loan is used). Here's how it works. First the key concepts:
 
-The test is deliberately severe, and run daily: month-end marks would miss the intra-month spikes -- a crash like March 2020 falls and partly rebounds inside a single month -- so the daily path is the credible version. I monitor daily with no preventive deleveraging between rebalances, so the book drifts to higher effective leverage after losses; I reset to the target $k$ and weights quarterly (my plan) or annually (the longest unmanaged drift); and I finance at the overnight €STR plus a pessimistic 0.5 % or 1 %, compounded. A margin call is a nominal event and the sleeve series are nominal, so the loan accrues at a nominal rate rather than the study's real $R_F$. The daily window reaches back to `{python} daily_start` -- set by the IEF-based bond sleeve -- covering the GFC, the March-2020 crash and the 2022 sell-off at daily resolution.
+- Gross assets value (GAV, €) = the value of the portfolio's assets, without subtracting liabilities.
+- Net asset value (NAV, €) = GAV - liabilities.
+- Margin ratio (%) = NAV / GAV. It's the share of the exposure (GAV) that you actually own (NAV), the inverse of the leverage ratio.
+- Margin (€) = GAV - NAV.
+- Maintenance margin ratio (%) = the margin ratio threshold under which IBKR liquidates some assets to reduce your liabilities and bring your margin ratio above the threshold.
+- Maintenance margin (€) = maintenance margin * GAV.
+- Excess liquidity (€) = NAV - maintenance margin * GAV.
+- Margin cushion (%) = margin ratio - maintenance margin ratio
 
-What maintenance ratio applies? Interactive Brokers margins European accounts on a risk-based portfolio model by default ([IBKR stocks](https://www.interactivebrokers.ie/en/trading/margin-stocks.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104), [bonds](https://www.interactivebrokers.ie/en/trading/margin-bonds.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104)), but UCITS funds and ETFs carry a 25 % maintenance requirement, so a book built entirely from UCITS ETFs sits at about 25 %. I take DBMFE at the same 25 % UCITS baseline. The grid brackets the realistic requirement (25 %) with two stress levels (30 %, 35 %) that stand in for the risk-based model tightening procyclically in a crisis.
+Liquidation is triggered when your margin ratio falls below the maintenance margin ratio i.e., when the excess liquidity goes negative.
 
-@tbl-stress-crisis pushes the actual daily path through each crisis; the drawdown and the lowest margin ratio are independent of $m$, so the ratio is read straight against the three thresholds. @tbl-stress-hist runs the full daily window across the grid, @fig-stress plots it, and @tbl-stress-boot bootstraps thirty-year paths from it.
+Simulated portfolio mechanics for the stress tests:
+- The portfolio starts at with a margin ratio $= 1/k =$ `{python} rho0_fmt`.
+- I use daily returns. The time range starts on `{python} daily_start`, covering the GFC, the March-2020 crash and the 2022 sell-off.
+- I don't apply dynamic, preventive deleveraging between rebalances, so the portfolio's margin ratio decreases after losses.
+- I reset the portfolio to the target leverage ratio $k$ and the asset weights quarterly (my plan) or annually (to see the cost of letting more drift occur)
+- I finance at the 3-month Euribor plus a pessimistic 0.5 % (as defined in @sec-leverage).
+- We've been speaking in real terms so far but for the stress tests, given that a liquidation is a nominal event, we will speak in nominal terms and the short box spread loan will use a nominal rate rather than the real $R_B$ rate used so far.
+
+IBKR uses "risk-based margin" on European accounts, by default (cf. [here](https://www.interactivebrokers.ie/en/trading/margin-stocks.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104) for stocks and [here](https://www.interactivebrokers.ie/en/trading/margin-bonds.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104) for bonds). But, in practice, UCITS securities generally carry a 25 % maintenance margin ratio (cf. [this discussion](https://www.reddit.com/r/vosfinances/comments/1vh7lfr/ibkr_maintenance_margin_call/)), so a portfolio made entirely of them should face a 25 % maintenance requirement. But IBKR reservers the right to raise that requirement as it wishes (and it has done so in the past), so we'll also consider two higher levels (30 % & 35 %).
+
+
+## Historical stress test
+
+@tbl-stress-crisis shows how the portfolio would have behaved, in terms of drawdown & margin ratio, through the crises in our study period. @tbl-stress-hist shows the result of runnig the portfolio over the whole period for each margin maintenance ratio & rebalancing frequency combination. And @fig-stress plots that result.
 
 ```{python}
 #| label: tbl-stress-crisis
-#| tbl-cap: "The levered book through each crisis (daily): peak-to-trough drawdown and the lowest margin ratio reached (to compare against 25 / 30 / 35 %). Quarterly resets, €STR + 0.5 %."
+#| tbl-cap: "The levered portfolio through each crisis: max drawdown and lowest margin ratio reached. Quarterly rebalancing."
 stress.crisis_report(
-    returns_daily, w_risky, k, daily_f, 63,
-    crises=stress.DAILY_CRISES, periods_per_year=252,
+    returns_daily,
+    w_risky,
+    k,
+    daily_f,
+    63,
+    crises=stress.DAILY_CRISES,
+    periods_per_year=252,
 ).style.hide(axis="index")
 ```
 
 ```{python}
 #| label: tbl-stress-hist
-#| tbl-cap: "Full daily-window run: worst drawdown, lowest margin cushion (ρ − m), and whether/when a call fires. €STR + 0.5 %."
+#| tbl-cap: "Full historical simulation: max drawdown, lowest margin cushion, and whether/when a liquidation is triggered."
 stress.historical_grid(
-    returns_daily, w_risky, k, spreads=(0.005,),
-    rebalances=stress.DAILY_REBALANCE, periods_per_year=252,
+    returns_daily,
+    w_risky,
+    k,
+    spreads=(0.005,),
+    rebalances=stress.DAILY_REBALANCE,
+    periods_per_year=252,
 ).drop(columns="financing").style.hide(axis="index")
 ```
 
 ```{python}
 #| label: fig-stress
-#| fig-cap: "The levered book over the full daily window (quarterly resets, €STR + 0.5 %): net asset value (top, log scale) and margin ratio (bottom) against the 25 / 35 % maintenance thresholds. The ratio's low is the March-2020 crash."
+#| fig-cap: "The levered portfolio over the full daily window (quarterly reblancing): NAV (top, log scale) and margin ratio (bottom)."
 import matplotlib.pyplot as plt
-
 from matplotlib.ticker import PercentFormatter
 
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True, height_ratios=[1.4, 1])
@@ -562,8 +634,12 @@ ax2.plot(daily_path.ratio.index, daily_path.ratio, color="#CC79A7", linewidth=1.
 for m_line in (0.25, 0.35):
     ax2.axhline(m_line, color="0.5", linewidth=1.0, linestyle=":")
     ax2.text(
-        daily_path.ratio.index[20], m_line + 0.004, f"m = {m_line:.0%}",
-        color="0.4", fontsize=8, va="bottom",
+        daily_path.ratio.index[20],
+        m_line + 0.004,
+        f"m = {m_line:.0%}",
+        color="0.4",
+        fontsize=8,
+        va="bottom",
     )
 _lo_date = daily_path.ratio.idxmin()
 ax2.annotate(
@@ -577,18 +653,18 @@ ax2.annotate(
 )
 ax2.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
 ax2.set_ylabel("Margin ratio ρ")
-ax2.set_ylim(0.20, 0.50)
+ax2.set_ylim(0.20, 0.72)
 ax2.grid(True, axis="y", color="0.92")
 ax2.set_axisbelow(True)
 ax2.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-The daily record is less comfortable than the leverage alone suggests. On the realised path the margin ratio bottoms at `{python} daily_min_rho_fmt` (`{python} daily_min_rho_date`, the March-2020 crash; @fig-stress, @fig-stress-covid): it never quite reached the 25 % UCITS line historically, but it fell clean through the 30 % and 35 % stress levels, so a book held at those maintenances would have been called (@tbl-stress-hist).
+The historical path never comes down close to the required margin ratio. The margin ratio bottoms at `{python} daily_min_rho_fmt` (`{python} daily_min_rho_date`, the March-2020 crash) -- more than double the 25 % threshold, and with a large cushing even relative to the extreme 35 % threshold (@fig-stress-covid). No threshold is breached anywhere in this realized path (@tbl-stress-hist).
 
 ```{python}
 #| label: fig-stress-covid
-#| fig-cap: "The margin ratio through the March-2020 crash, day by day, against the 25 / 35 % thresholds."
+#| fig-cap: "The margin ratio during the March-2020 crash."
 import matplotlib.pyplot as plt
 
 from matplotlib.ticker import PercentFormatter
@@ -603,151 +679,22 @@ for m_line in (0.25, 0.35):
     )
 ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
 ax.set_ylabel("Margin ratio ρ")
-ax.set_ylim(0.22, 0.46)
+ax.set_ylim(0.20, 0.62)
 ax.grid(True, axis="y", color="0.92")
 ax.set_axisbelow(True)
 ax.spines[["top", "right"]].set_visible(False)
 plt.show()
 ```
 
-The bootstrap is starker still (@tbl-stress-boot). Over thirty-year paths, even the realistic 25 % UCITS maintenance is called in `{python} pcall25_fmt` of runs, and the 30 % and 35 % stress levels in essentially all of them: the realised history simply did not draw the one adverse sequence that a reset fails to interrupt, but the resampled paths do. The drawdown is severe whether or not a call fires -- the median thirty-year path draws down about `{python} dd_med_fmt`, with a fifth-percentile tail near `{python} dd_p5_fmt`.
+
+## Bootstrapped stress test
+
+Across 2000 30-year bootstrapped paths (using stationnary bootstrapping, cf. Politis & Romano ([1994](https://doi.org/10.1080/01621459.1994.10476870))), no liquidation is ever triggered across the 25 %, 30 %, and 35 % thresholds (@tbl-stress-boot).
 
 ```{python}
 #| label: tbl-stress-boot
-#| tbl-cap: "Daily stationary-bootstrap 30-year paths (2000 runs, mean block ~63 trading days): probability of a margin call, and the median and fifth-percentile worst drawdown. €STR + 0.5 %."
+#| tbl-cap: "Results of the stationary-bootstrap (2000 30-year paths, mean block size of ~63 trading days)"
 _boot.drop(columns="financing").style.hide(axis="index")
 ```
 
-So at the CRRA-optimal $k =$ `{python} kstar_fmt` the margin call is not a remote tail: a roughly one-in-four chance over thirty years even at the maintenance I actually face. The leverage that maximises my utility is silent on this, because utility prices drawdown but not the absorbing event of a forced liquidation. The next section adds the constraint it leaves out.
-
-
-# Margin-aware leverage {#sec-margin-aware}
-
-```{python}
-#| label: margin-aware-calc
-#| include: false
-from constrained import (
-    composition_sweep,
-    critical_leverages,
-    historical_breach_leverage,
-    margin_call_probability,
-    ruin_safe_leverage,
-)
-
-crit = critical_leverages(returns_daily, w_risky, maintenance=0.25)
-k_margin = float(np.percentile(crit, 5))
-p_call_kstar = margin_call_probability(crit, k)
-p_call_kmargin = margin_call_probability(crit, k_margin)
-
-er_tan = r_risky - RF_REAL  # tangency excess real return
-
-
-def _J(kk, g=GAMMA):
-    return RF_REAL + kk * er_tan - 0.5 * g * (kk * s_risky) ** 2
-
-
-def _Er(kk):
-    return RF_REAL + kk * er_tan
-
-
-kstar_fmt = f"{k:.2f}"
-k_margin_fmt = f"{k_margin:.2f}"
-pcall_kstar_fmt = f"{p_call_kstar:.0%}"
-pcall_km_fmt = f"{p_call_kmargin:.0%}"
-er_kstar_fmt = f"{_Er(k):.2%}"
-er_km_fmt = f"{_Er(k_margin):.2%}"
-er_drop_fmt = f"{_Er(k) - _Er(k_margin):.2%}"
-k_nohist_fmt = f"{historical_breach_leverage(returns_daily, w_risky):.2f}"
-k_margin30_fmt = f"{ruin_safe_leverage(returns_daily, w_risky, maintenance=0.30):.2f}"
-```
-
-The leverage in @sec-leverage, $k^* =$ `{python} kstar_fmt`, maximises my CRRA utility -- but that objective prices *drawdown* (through $\gamma$) and not the *absorbing* event that sits right next to it: a forced liquidation. The stress test makes the gap concrete. At $k^*$ the book starts at $\rho_0 = 1/k^* =$ `{python} rho0_fmt`, and run daily through bootstrapped history it breaches the 25 % UCITS maintenance in `{python} pcall_kstar_fmt` of thirty-year paths (@sec-stress). A one-in-four chance of being sold out at the bottom is not a risk my $\gamma$ ever agreed to bear. So I add the constraint the utility function leaves out.
-
-I cap leverage at $k_\text{margin}$: the largest $k$ whose daily-bootstrap probability of *any* margin call (25 % maintenance, quarterly resets) stays within a 5 % ruin budget over thirty years. On this book that is $k_\text{margin} =$ `{python} k_margin_fmt`, and the trade it offers is nearly free (@fig-margin-aware). Trimming from `{python} kstar_fmt` to `{python} k_margin_fmt` cuts the call probability from `{python} pcall_kstar_fmt` to `{python} pcall_km_fmt`, while giving up only `{python} er_drop_fmt` of expected real return (`{python} er_kstar_fmt` to `{python} er_km_fmt`) and *no measurable utility*: $k^*$ sits on the flat top of the utility parabola, so the return I forgo is matched by the variance penalty I save. Ruin risk falls five-fold at a cost of essentially zero.
-
-```{python}
-#| label: fig-margin-aware
-#| fig-cap: "Utility is flat where ruin is not. CRRA utility $J$ (γ = 2, left) and the 30-year margin-call probability (right) as a function of gross leverage $k$. The unconstrained optimum $k^*$ maximises $J$ but carries a large call probability; trimming to $k_\\text{margin}$ (the 5 % ruin budget, dotted) sheds most of the call risk while $J$ barely moves."
-import matplotlib.pyplot as plt
-
-from matplotlib.ticker import PercentFormatter
-
-ks = np.linspace(1.5, 3.6, 120)
-Js = np.array([_J(kk) for kk in ks])
-pcs = np.array([margin_call_probability(crit, kk) for kk in ks])
-
-fig, ax1 = plt.subplots(figsize=(8, 4))
-ax1.plot(ks, Js, color="#0072B2", linewidth=1.8)
-ax1.set_xlabel("Gross leverage $k$")
-ax1.set_ylabel("CRRA utility $J$ (γ = 2)", color="#0072B2")
-ax1.tick_params(axis="y", labelcolor="#0072B2")
-ax1.set_xlim(ks.min(), ks.max())
-
-ax2 = ax1.twinx()
-ax2.plot(ks, pcs, color="#CC79A7", linewidth=1.8)
-ax2.set_ylabel("P(margin call) over 30y", color="#CC79A7")
-ax2.tick_params(axis="y", labelcolor="#CC79A7")
-ax2.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
-ax2.axhline(0.05, color="0.6", linewidth=0.8, linestyle=":")
-
-y_txt = ax1.get_ylim()[0] + 0.9 * (ax1.get_ylim()[1] - ax1.get_ylim()[0])
-for xk, lab in [(k, "$k^*$"), (k_margin, "$k_\\text{margin}$")]:
-    ax1.axvline(xk, color="0.5", linewidth=1.0, linestyle="--")
-    ax1.text(xk - 0.02, y_txt, f"{lab} = {xk:.2f}", fontsize=8, color="0.3", ha="right", rotation=90)
-ax1.spines[["top"]].set_visible(False)
-ax2.spines[["top"]].set_visible(False)
-plt.show()
-```
-
-## Does the cap change the composition? {#sec-tilt}
-
-With unlimited leverage, the mutual-fund separation theorem I invoked when choosing the tangency weights says to hold the tangency and lever it. A binding cap can break that logic: if I cannot reach my risk target by levering the low-volatility tangency, a more equity-heavy book -- higher return, lower Sharpe -- might reach it without hitting the margin wall, and so yield more utility. @tbl-composition-sweep tests this, sweeping the equity weight up from the tangency's `{python} w_equity_fmt`, splitting the remainder among the other sleeves in their tangency proportions, and capping each candidate at its own $k_\text{margin}$.
-
-```{python}
-#| label: tbl-composition-sweep
-#| tbl-cap: "Composition sweep under the ruin cap. Each row is a book with the given equity weight (remainder split in tangency proportions), capped at its own $k_\\text{margin}$. `γ=1` is the compound-growth (full-Kelly) objective; `γ=2` is my CRRA utility. Growth peaks away from the tangency; utility at γ = 2 does not."
-sweep = composition_sweep(cov_final, bl_post, returns_daily, w_risky)
-w_eq_growth_fmt = f"{sweep.loc[sweep['growth_g1'].idxmax(), 'w_eq']:.0%}"
-w_eq_util_fmt = f"{sweep.loc[sweep['J_g2'].idxmax(), 'w_eq']:.0%}"
-(
-    pd.DataFrame(
-        {
-            "equity weight": sweep["w_eq"].map("{:.0%}".format),
-            "σ": sweep["sigma"].map("{:.1%}".format),
-            "Sharpe": sweep["sharpe"].map("{:.2f}".format),
-            "k_margin": sweep["k_margin"].map("{:.2f}".format),
-            "γ=2 leverage": sweep["k_g2"].map("{:.2f}".format),
-            "γ=2 E[r]": sweep["Er_g2"].map("{:.1%}".format),
-            "γ=2 utility J": sweep["J_g2"].map("{:.3f}".format),
-            "γ=1 growth": sweep["growth_g1"].map("{:.1%}".format),
-        }
-    )
-    .style.hide(axis="index")
-)
-```
-
-```{python}
-#| label: fig-composition-sweep
-#| fig-cap: "Compound growth (γ = 1) and CRRA utility (γ = 2) across the equity-weight sweep, each book capped at its own $k_\\text{margin}$. Growth is humped -- it rewards tilting toward equity -- while my γ = 2 utility declines monotonically from the tangency (dashed)."
-import matplotlib.pyplot as plt
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.plot(sweep["w_eq"], sweep["growth_g1"], marker="o", color="#009E73", label="compound growth (γ = 1)")
-ax.plot(sweep["w_eq"], sweep["J_g2"], marker="o", color="#0072B2", label="CRRA utility $J$ (γ = 2)")
-ax.axvline(float(w_risky["equity"]), color="0.5", linewidth=1.0, linestyle="--")
-ax.text(float(w_risky["equity"]) + 0.005, ax.get_ylim()[0], " tangency", fontsize=8, color="0.4", va="bottom")
-ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0))
-ax.set_xlabel("Equity weight")
-ax.set_ylabel("Real annual rate")
-ax.legend(frameon=False)
-ax.grid(True, axis="y", color="0.92")
-ax.set_axisbelow(True)
-ax.spines[["top", "right"]].set_visible(False)
-plt.show()
-```
-
-The tilt pays only for a growth-maximiser. Compound growth -- the $\gamma = 1$, full-Kelly objective -- does peak away from the tangency, near an equity weight of `{python} w_eq_growth_fmt`: there the cap binds hard at every composition, so the extra return of a heavier equity book outweighs its lower Sharpe. But at my $\gamma = 2$ the utility-maximising composition is the tangency itself (`{python} w_eq_util_fmt`). My desired leverage `{python} kstar_fmt` already sits essentially at the cap `{python} k_margin_fmt`, so the constraint barely binds and separation survives; tilting toward equity only lowers my utility.
-
-I therefore hold the tangency weights and lever them to $k_\text{margin} =$ `{python} k_margin_fmt`, not the unconstrained `{python} kstar_fmt` -- the same utility for a fifth of the ruin risk. The equity tilt is a tool for a lower risk aversion than mine.
-
-The 5 %-at-25 % rule is a choice, and the cap moves with it. Requiring only that the *realised* history never called lifts it to `{python} k_nohist_fmt` (but one path is a thin guarantee); demanding the 5 % budget against a stressed 30 % maintenance -- IBKR can tighten procyclically -- lowers it to `{python} k_margin30_fmt`.
+So, at the CRRA-optimal $k =$ `{python} kstar_fmt`, the risk of forced liquidation is very low. The max drawdown is still substantial, but this is what my personal $\gamma$ accounts for already.

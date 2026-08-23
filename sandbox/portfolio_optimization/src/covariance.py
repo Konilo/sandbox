@@ -9,14 +9,15 @@ average sample correlation): for four cross-asset sleeves it is a more
 defensible prior than the ``single_factor`` market model (ill-defined for gold
 and managed futures) or the ``constant_variance`` scaled identity.
 
-Pass 3 (no overrides): the shrunk covariance is used as-is. The equity-bonds
-correlation the earlier (unhedged) design distrusted is, for the EUR-hedged US
-Treasury sleeve, a structural flight-to-quality decorrelation and the very
-reason the sleeve was chosen; overriding it away would be inconsistent, so it is
-left at its Ledoit-Wolf-shrunk level, which already tempers the raw estimate. Its
-one failure mode (inflation shocks, e.g. 2022) is covered by the gold and trend
-sleeves, not by distorting this input. ``final_covariance`` still exposes optional
-``rho_equity_bonds`` / ``sigma_bonds`` overrides for sweeps, but both default off.
+Pass 3 (targeted override): the shrunk covariance is used as-is except for the
+equity-bonds correlation, which the study overrides to 0. Its sample value is
+negative, but the stock-bond correlation's sign is regime-dependent (negative
+under growth shocks, positive under inflation shocks) and forward capital-market
+assumptions place it near zero rather than reliably negative; 0 is the
+conservative pivot between regimes, and the inflation-regime failure is left to
+the gold and trend sleeves. ``final_covariance`` applies this via
+``rho_equity_bonds`` (and exposes ``sigma_bonds``); both are optional and default
+off, so the raw shrunk matrix and other sweeps remain reachable.
 """
 
 from __future__ import annotations

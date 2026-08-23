@@ -31,18 +31,20 @@ VIEWS_REAL = {
     "gold": 0.0000,  # long-run real return = inflation (Ilmanen)
 }
 
-# Real financing / risk-free anchor for the excess returns that drive BOTH the
-# tangency (composition) and the CRRA leverage. It is load-bearing: a positive
-# real rate thins every sleeve's excess return, pushes the long-only tangency
-# out of any sub-rate sleeve, and lowers k* = S / (gamma * sigma).
-#
-# = EUR nominal financing - expected inflation
-# = 2.186% (ECB euro short-term rate, reference 2026-07-24) - 2.0%
-# ~= 0.19% real.
-# The box-spread financing cost is the EUR risk-free curve at the box tenor;
-# overnight EUR STR is its base -- exact if rolling short boxes / a flat curve,
-# and it ignores any small box spread over the risk-free (both second-order).
+# Real RISK-FREE cash rate: the collateral yield / prior anchor.
+# = overnight €STR 2.186% (ECB, reference 2026-07-24) - 2.0% expected inflation
+# ~= 0.19% real. Anchors the BL equilibrium prior, the tangency Sharpe
+# (composition), and the trend sleeve's collateral yield -- NOT the leverage,
+# which is financed at the box borrowing rate BOX_REAL below.
 RF_REAL = 0.0019
+
+# Real BOX-SPREAD borrowing rate that finances the leverage (leverage.py):
+# 3-month Euribor 2.524% (euribor-rates.eu, 2026-08-21) + 0.5% box spread
+# (Cayas's central assumption, "MSCI World ... Cayas fait (bien) mieux") - 2.0%
+# inflation ~= 1.02% real. Distinct from RF_REAL: the box is a ~3-month loan, so
+# its base is the 3-month rate and the +0.5% is the box's spread over it; the
+# prior / tangency / collateral instead earn the overnight risk-free.
+BOX_REAL = 0.0102
 
 
 def expected_returns(cov: pd.DataFrame | None = None) -> pd.Series:

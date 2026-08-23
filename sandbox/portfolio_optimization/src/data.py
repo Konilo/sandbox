@@ -22,7 +22,11 @@ Bonds: US Treasury 7-10y, EUR-hedged. The vehicle is a EUR-hedged UCITS ETF on t
       ICE US Treasury 7-10y index (e.g. iShares CEMF, IE000K1VI152; or Amundi 7USH
       on the Bloomberg 7-10y index). The EUR-hedged total return is the local USD
       total return plus the one-month covered-interest-parity carry,
-      ``(i_EUR - i_USD) / 12``. Proxied by IEF (US-listed, same ICE index, long
+      ``(i_EUR - i_USD) / 12`` -- the covered-interest-parity equivalent of the
+      rolling one-month currency forward that the ICE hedged index itself applies
+      (ICE Bond Index Methodologies, pp. 22-23,
+      https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf). Proxied
+      by IEF (US-listed, same ICE index, long
       history): its dividend-adjusted close is the USD total-return level (Yahoo
       daily, snapshot 2026-08-08, from 2002-07), and month-end USD returns plus the
       carry from FRED short rates (1-month UST DGS1MO, euro overnight

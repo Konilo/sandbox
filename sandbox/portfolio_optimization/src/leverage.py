@@ -1,16 +1,18 @@
 """Leverage (pass 5): scale the risky portfolio to the CRRA-optimal risk.
 
-With a real financing rate ``RF_REAL`` (``mu.RF_REAL``, the box-spread cost) and
-a chosen risky portfolio of *excess* Sharpe ``S = (mu_p - RF_REAL) / sigma`` and
+With the box-spread borrowing rate ``BOX_REAL`` (``mu.BOX_REAL``) and a chosen
+risky portfolio of *excess* Sharpe ``S = (mu_p - BOX_REAL) / sigma`` and
 volatility ``sigma``, a CRRA investor with risk aversion ``gamma`` holds a
 fraction
 
     k* = S / (gamma * sigma)
 
-of wealth in the risky portfolio (borrowing or lending the rest at ``RF_REAL``).
-That implies a target volatility ``sigma* = k* * sigma = S / gamma`` and an
-expected real return ``RF_REAL + S**2 / gamma``. ``k* > 1`` is gross leverage,
-financed by short box spreads at ~``RF_REAL``.
+of wealth in the risky portfolio (borrowing the rest at ``BOX_REAL``). That
+implies a target volatility ``sigma* = k* * sigma = S / gamma`` and an expected
+real return ``BOX_REAL + S**2 / gamma``. ``k* > 1`` is gross leverage, financed
+by short box spreads at ~``BOX_REAL``. The tangency itself is struck at the
+risk-free ``RF_REAL`` (composition); the leverage excess is measured over the
+higher ``BOX_REAL``.
 
 These are the *unconstrained* optima; a separate, practical cap on achievable
 leverage (portfolio margin, box-spread capacity) is applied downstream.
@@ -20,7 +22,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from mu import RF_REAL
+from mu import BOX_REAL
 
 GAMMA = 2.0
 
@@ -39,11 +41,12 @@ def target_volatility(sharpe: float, gamma: float = GAMMA) -> float:
 
 
 def levered_expected_return(
-    sharpe: float, gamma: float = GAMMA, rf: float = RF_REAL
+    sharpe: float, gamma: float = GAMMA, rf: float = BOX_REAL
 ) -> float:
     """Expected real return of the levered book, ``rf + S**2 / gamma``.
 
-    ``sharpe`` is the *excess* Sharpe over ``rf``; ``rf`` defaults to ``RF_REAL``.
+    ``sharpe`` is the *excess* Sharpe over ``rf``; ``rf`` defaults to the box
+    borrowing rate ``BOX_REAL``.
     """
     return rf + sharpe**2 / gamma
 

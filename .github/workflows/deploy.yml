@@ -28,8 +28,16 @@ jobs:
         with:
           version: '1.7.32'
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
       - name: Render site
-        run: quarto render
+        run: uv run quarto render
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'

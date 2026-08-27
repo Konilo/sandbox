@@ -30,8 +30,9 @@ Bonds: US Treasury 7-10y, EUR-hedged. The vehicle is a EUR-hedged UCITS ETF on t
       history): its dividend-adjusted close is the USD total-return level (Yahoo
       daily, snapshot 2026-08-08, from 2002-07), and month-end USD returns plus the
       carry from FRED short rates (1-month UST DGS1MO, euro overnight
-      IRSTCI01EZM156N) give the hedged EUR return. Validated at 0.99 monthly
-      correlation against the live hedged ETFs (7USH 2023+, CEMF 2025+).
+      IRSTCI01EZM156N) give the hedged EUR return. Validated against the live
+      hedged ETF 7USH (2023+) on both correlation and level by
+      ``hedge_tracking_check``.
 
 Trend: SG CTA Index, the live net-of-fee managed-futures benchmark that the
       vehicle DBMFE replicates, from SG Prime Services (snapshot 2026-07-25).
@@ -69,6 +70,14 @@ FRED_USD_1M_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS1MO"
 FRED_USD_1M_RAW = DATA_DIR / "fred_DGS1MO_2026-08-08.csv"
 FRED_EUR_ON_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=IRSTCI01EZM156N"
 FRED_EUR_ON_RAW = DATA_DIR / "fred_IRSTCI01EZM156N_2026-08-08.csv"
+
+# Live EUR-hedged UCITS ETF, used only to validate the reconstructed hedge.
+# Month-end dividend-adjusted closes from Yahoo, snapshot 2026-08-26.
+LIVE_HEDGED_URL = (
+    "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+    "?range=5y&interval=1mo&events=div%2Csplit"
+)
+LIVE_HEDGED_RAW = {"7USH": DATA_DIR / "yahoo_7USH_monthly_2026-08-26.json"}
 
 SG_CTA_RAW = DATA_DIR / "sg_cta_index_2026-07-25.xls"
 ECB_EURUSD_URL = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
@@ -220,12 +229,46 @@ def ustsy_hedged_monthly_returns(
         hedged = local_usd_return + (i_EUR - i_USD) / 12
 
     ``local_usd_return`` is IEF's month-end total return (USD); the carry is set at
-    the start of the month (prior month-end rates). Validated at 0.99 monthly
-    correlation against the live hedged ETFs 7USH (2023+) and CEMF (2025+).
+    the start of the month (prior month-end rates); ``hedge_tracking_check``
+    validates it against the live hedged ETF 7USH (2023+).
     """
     local = load_ief_usd_levels(ief_path).resample("ME").last().pct_change()
     carry = eur_minus_usd_carry(usd_path, eur_path).reindex(local.index).ffill().shift(1) / 12.0
     return (local + carry).dropna().rename("ustsy_hedged_ret")
+
+
+def live_hedged_monthly_returns(name: str) -> pd.Series:
+    """Month-end returns of a live EUR-hedged UCITS ETF.
+
+    ``{"date", "value"}`` records. Yahoo labels a monthly bar at the start of its
+    period, which the UTC offset lands on the prior month-end; the snapshot is
+    written already shifted onto the month the bar covers.
+    """
+    records = json.loads(LIVE_HEDGED_RAW[name].read_text())
+    index = pd.DatetimeIndex([pd.Timestamp(r["date"]) for r in records])
+    levels = pd.Series([r["value"] for r in records], index=index).sort_index()
+    return levels.pct_change().dropna().rename(name)
+
+
+def hedge_tracking_check() -> pd.DataFrame:
+    """Reconstructed hedge vs the live ETF: correlation and annualized level."""
+    study = ustsy_hedged_monthly_returns()
+    rows = {}
+    for name in LIVE_HEDGED_RAW:
+        joined = pd.concat(
+            {"study": study, "live": live_hedged_monthly_returns(name)}, axis=1
+        ).dropna()
+        annualized = (1.0 + joined).prod() ** (12.0 / len(joined)) - 1.0
+        rows[name] = {
+            "months": len(joined),
+            "from": f"{joined.index[0]:%Y-%m}",
+            "to": f"{joined.index[-1]:%Y-%m}",
+            "correlation": joined["study"].corr(joined["live"]),
+            "study (%/y)": annualized["study"],
+            "live (%/y)": annualized["live"],
+            "difference (bp/y)": (annualized["study"] - annualized["live"]) * 1e4,
+        }
+    return pd.DataFrame(rows).T
 
 
 def download_ecb_eurusd(dest: Path = EURUSD_RAW) -> Path:

@@ -40,10 +40,10 @@ import pandas as pd
 
 # Nominal financing base: 3-month Euribor (2.524%, euribor-rates.eu, 2026-08-21),
 # the rate a rolled ~3-month box borrows at. The sweep adds the box spread on top
-# (Cayas's central case is +0.5 pp; +1 pp is a severe stress). Real equivalent is
+# (realistic ~+0.3 pp; Cayas +0.1-0.5, +0.5 pp conservative). Real equivalent is
 # mu.BOX_REAL.
 EURIBOR3M_NOMINAL = 0.02524
-FINANCING_SPREADS = (0.005, 0.010)
+FINANCING_SPREADS = (0.003, 0.005)
 
 MAINTENANCE_RATIOS = (0.25, 0.30, 0.35)  # 25% ~ typical UCITS; 35% deliberately stressed
 

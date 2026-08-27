@@ -1,8 +1,9 @@
 """Black-Litterman engine: equilibrium prior + views -> posterior expected returns.
 
-The posterior mu feeds ``composition.tangency_weights``. All figures real and
-EUR-consistent: the caps only supply dimensionless market weights, and the prior
-is struck at ``mu.RF_REAL`` so the posterior is a real return. See the "Expected
+The posterior mu, net of vehicle fees, feeds ``composition.tangency_weights``.
+All figures real and EUR-consistent: the caps only supply dimensionless market
+weights, and the prior is struck at ``mu.RF_REAL`` so the posterior is a real
+return. See the "Expected
 returns" section of the qmd for the choices behind the constants below.
 """
 
@@ -12,7 +13,7 @@ import pandas as pd
 from pypfopt import black_litterman
 from pypfopt.black_litterman import BlackLittermanModel
 
-from mu import RF_REAL, VIEWS_REAL
+from mu import RF_REAL, TERS, VIEWS_REAL
 
 # Market caps (USD tn, 2026; only the ratios enter). Trend (managed futures) is
 # zero-net-supply, so it has no cap: its prior falls out of the reverse-opt as
@@ -78,5 +79,15 @@ def bl_model(cov: pd.DataFrame) -> BlackLittermanModel:
 
 
 def posterior_returns(cov: pd.DataFrame) -> pd.Series:
-    """Black-Litterman posterior real expected returns (the MVO input)."""
+    """Black-Litterman posterior real expected returns, gross of vehicle fees."""
     return bl_model(cov).bl_returns().reindex(cov.index).rename("mu")
+
+
+def vehicle_fees(index: pd.Index) -> pd.Series:
+    """Ongoing charge of each sleeve's vehicle, ordered to match ``index``."""
+    return pd.Series(TERS).reindex(index).fillna(0.0).rename("ter")
+
+
+def posterior_net_returns(cov: pd.DataFrame) -> pd.Series:
+    """Posterior returns net of vehicle fees -- the MVO input."""
+    return (posterior_returns(cov) - vehicle_fees(cov.index)).rename("mu")

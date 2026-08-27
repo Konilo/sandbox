@@ -60,10 +60,10 @@ I am designing this strategy to be implemented in an [Interactive Brokers (IBKR)
 
 I have already defined the universe of assets I will consider and submit to the optimization (all EUR-denominated):
 
-- an [MSCI ACWI](https://www.msci.com/indexes/index/892400/msci-acwi-index) ETF;
-- a US Treasury 7-10 year bond ETF, EUR-hedged, such as [CEMF](https://www.justetf.com/en/etf-profile.html?isin=IE000K1VI152);
-- a [managed futures](https://www.aqr.com/Insights/Research/White-Papers/Understanding-Managed-Futures) ETF such as [DBMFE](https://www.imgp.com/fund/LU2951555403-imgp-dbi-managed-futures-fund-r-eur-ucits-etf/) (ideally, several ones to diversify the manager risk);
-- and a gold ETF.
+- an [MSCI ACWI](https://www.msci.com/indexes/index/892400/msci-acwi-index) ETF such as [IUSQ](https://www.justetf.com/en/etf-profile.html?isin=IE00B6R52259) (0.20 % TER);
+- a EUR-hedged US Treasury 7-10 year bond ETF such as [CEMF](https://www.justetf.com/en/etf-profile.html?isin=IE000K1VI152) or [7USH](https://www.justetf.com/en/etf-profile.html?isin=LU1407888137) (0.10 & 0.06 % TER, respectively);
+- a [managed futures](https://www.aqr.com/Insights/Research/White-Papers/Understanding-Managed-Futures) ETF such as [DBMFE](https://www.imgp.com/fund/LU2951555403-imgp-dbi-managed-futures-fund-r-eur-ucits-etf/) (0.75 % TER) (ideally, several ones to diversify the manager risk);
+- and a gold ETF -- [PPFB](https://www.justetf.com/en/etf-profile.html?isin=IE00B4ND3602) (0.12 % TER).
 
 The definition of this universe is out of scope but was inspired, among others, by Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)).
 
@@ -105,7 +105,8 @@ import pandas as pd
 # The study's Python modules live in src/.
 sys.path.insert(0, "src")
 
-from data import monthly_returns_matrix
+from data import hedge_tracking_check, monthly_returns_matrix
+from mu import BOX_REAL
 
 
 def mask_upper(matrix):
@@ -121,9 +122,17 @@ data_start = f"{returns.index.min():%Y-%m}"
 data_end = f"{returns.index.max():%Y-%m}"
 n_months = len(returns)
 n_years = round(n_months / 12)
+box_fmt = f"{BOX_REAL:.2%}"  # real box borrowing rate R_B, reused across the prose
+
+# EUR-hedge reconstruction vs the live hedged ETFs, surfaced in the prose below.
+_hedge = hedge_tracking_check()
+hedge_7ush_n = int(_hedge.loc["7USH", "months"])
+hedge_7ush_from = _hedge.loc["7USH", "from"]
+hedge_7ush_corr = f"{_hedge.loc['7USH', 'correlation']:.2f}"
+hedge_7ush_diff = f"{_hedge.loc['7USH', 'difference (bp/y)']:+.0f}"
 ```
 
-I had to reconstruct the EUR hedging component of my bonds sleeve proxy data. My target vehicle is a EUR-hedged UCITS ETF on the ICE US Treasury 7-10 y index, but this type of instrument is too recent for a long study, so I (i) proxy the underlying with [IEF](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf) -- a US ETF on the same index -- and (ii) simulate the EUR hedge. Hedging is simulated by assuming a rolling one-month currency forward contract was held on the index's full market value, as per [ICE Bond Index Methodologies](https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf), pp. 22-23; I don't have that forward series, but [covered interest parity](https://en.wikipedia.org/wiki/Interest_rate_parity) ties its cost to the short-rate differential between the two legs of the currency forward (EUR & USD), so I add the one-month carry from [FRED](https://fred.stlouisfed.org/series/DGS1MO) short rates (the euro overnight rate minus the 1-month US T-bill). The resulting time series has a ~0.99 correlation with live hedged ETFs (7USH from 2023, CEMF from 2025).
+I had to reconstruct the EUR hedging component of my bonds sleeve proxy data. My target vehicle is a EUR-hedged UCITS ETF on the ICE US Treasury 7-10 y index, but this type of instrument is too recent for a long study, so I (i) proxy the underlying with [IEF](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf) -- a US ETF on the same index -- and (ii) simulate the EUR hedge. Hedging is simulated by assuming a rolling one-month currency forward contract was held on the index's full market value, as per [ICE Bond Index Methodologies](https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf), pp. 22-23; I don't have that forward series, but [covered interest parity](https://en.wikipedia.org/wiki/Interest_rate_parity) ties its cost to the short-rate differential between the two legs of the currency forward (EUR & USD), so I add the one-month carry from [FRED](https://fred.stlouisfed.org/series/DGS1MO) short rates (the euro overnight rate (`IRSTCI01EZM156N`) minus the 1-month US T-bill (`DGS1MO`)). Against [7USH](https://www.justetf.com/en/etf-profile.html?isin=LU1407888137), over the `{python} hedge_7ush_n` months from `{python} hedge_7ush_from`, the correlation is `{python} hedge_7ush_corr` and my reconstructed proxy data differs from 7USH's annualized return by only `{python} hedge_7ush_diff` bp/yr. But that validation only reaches back to 2023.
 
 The SG CTA Index is the live, net-of-fee return of a [pool of the largest managed-futures CTAs](https://wholesale.banking.societegenerale.com/fileadmin/indices_feeds/SG_CTA_Index_Constituents.pdf). It is a good proxy for DBMFE (which uses it as its benchmark). DBMFE is an unhedged, EUR-denominated share class, so I simply convert the USD index to EUR and leave it unhedged.
 
@@ -362,23 +371,27 @@ The market's risk aversion, $\gamma_M$, is needed, in this process, to scale the
 
 Each sleeve's view is an estimate (partly inspired by Ilmanen's ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)) asset class-specific methods) fed to the Black-Litterman model with a confidence level (between 0 and 1) representing my degree of trust in the estimate (Idzorek, [2007](https://doi.org/10.1016/B978-075068321-0.50003-0)):
 
-- **Bonds: ~1.0 % real, confidence 0.7.** The ICE US Treasury 7-10y index the sleeve tracks yields 4.60 % to maturity (nominal, USD; [iShares IEF](https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf), 2026-08). Hedging to EUR gives up the USD-minus-EUR short-rate differential (covered interest parity) -- currently ~1.6 pp (US 1-month 3.78 %, [FRED](https://fred.stlouisfed.org/series/DGS1MO); €STR 2.19 %, [ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html)) -- leaving ~3.0 % hedged nominal; minus ~2 % expected inflation ([ECB SPF](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.0 % real. The starting yield is a strong forward predictor of the nominal return and the CAPM prior is a weak model for bonds, so I lean on the view.
+- **Bonds: ~1.3 % real, confidence 0.7.** The ICE US Treasury 7-10 y index the sleeve tracks yields 4.54 % to maturity (nominal, USD, and gross of fees by construction; [CEMF](https://www.ishares.com/uk/individual/en/products/344759/ishares-treasury-bond-7-10yr-ucits-etf), 2026-08-25). Because it is a constant-maturity index -- it rolls down the curve rather than holding to maturity -- the forward-looking return is carry plus roll-down, not the yield alone (Koijen, Moskowitz, Pedersen & Vrugt, [2018](https://doi.org/10.1016/j.jfineco.2017.11.002)): the 7-10 y segment slopes at ~5 bp/y ([FRED](https://fred.stlouisfed.org/series/DGS10), `DGS10` 4.70 % against `DGS7` 4.55 %, 2026-08-24), which over the index's 6.83-year effective duration is worth ~0.34 pp. That is a claim on the term premium rather than free carry: under the expectations hypothesis an upward-sloping curve implies short rates rise by just enough to cancel the roll-down, so I keep the 0.34 pp only because the 7-10 y term premium is positive and comfortably wider than what I am claiming. Hedging to EUR gives up the USD-minus-EUR short-rate differential (covered interest parity) -- currently ~1.60 pp (US 1-month 3.79 %, [FRED](https://fred.stlouisfed.org/series/DGS1MO), 2026-08-24; €STR 2.189 %, [ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html), 2026-08-25). I charge no cross-currency basis on top of that. The mechanism is real and has persisted since 2008 (Du, Tepper & Verdelhan, [2018](https://doi.org/10.1111/jofi.12620)), but it is doesn't seem material today: CME's [XEURBI](https://www.cmegroup.com/market-data/cme-group-benchmark-administration/eur-usd-cross-currency-basis-index.html) index put the EUR/USD basis between +0.02 and -0.60 bp over 2026-08-20 to 08-26, against -35 to -45 bp in 2023. That leaves ~3.28 % hedged nominal; minus ~2 % expected inflation ([ECB SPF](https://www.ecb.europa.eu/stats/ecb_surveys/survey_of_professional_forecasters/html/ecb.spf2026q3.en.html)) gives ~1.28 % real. My confidence level is high despite this intricate estimation gymnastic because the starting yield is a strong forward predictor of the nominal return, while the CAPM prior is a weak model for bonds.
 - **Equity: 4.03 % real, confidence 0.8.** Elm Wealth's all-world payout-adjusted cyclically-adjusted earnings yield (P-CAEY; White & Haghani, [2024](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4874559)) -- a direct forward real-return estimate -- at 4.03 % ([Elm Wealth](https://elmwealth.com/capital-market-assumptions/), 2026-07-27). It is forward-facing and valuation-aware, whereas the prior is valuation-blind.
 - **Trend: ~2.7 % real, confidence 0.65.** A lot of evidence backs the trend premium. It was positive over every decade since 1800 (Lempérière et al., [2014](https://doi.org/10.21314/JOIS.2014.043)), a diversified time-series-momentum Sharpe above 1 since 1966 (Moskowitz, Ooi & Pedersen, [2012](https://doi.org/10.1016/j.jfineco.2011.11.003)), and robust across a century net of fees (Hurst, Ooi & Pedersen, [2017](https://doi.org/10.3905/jpm.2017.44.1.015)). Its existence is well-established. Its magnitude is not, though. Those studies' gross Sharpes of 0.7 to >1 come from stronger, less-crowded pre-2000 trends, while the live net-of-fee DBMFE I proxy with the SG CTA Index had a Sharpe of only ~0.13 over our sample period. I place my view between those bounds. The EUR-unhedged SG CTA that DBMFE benchmarks carries a ~`{python} trend_vol_fmt` volatility; I assign it a forward net Sharpe of `{python} trend_sharpe_fmt`. Its excess real return is then `{python} trend_sharpe_fmt` $\times$ `{python} trend_vol_fmt` $\approx$ `{python} trend_excess_fmt`, and adding the `{python} rf_real_fmt` real risk-free cash rate (the collateral yield $R_F$, not the box borrowing rate; cf. @sec-leverage) gives `{python} trend_return_fmt` real. The confidence is set below the ones of equity and bonds, and above what a noisy estimate would get, because the CAPM equilibrium prior is structurally unfit here: trend is an anomaly a single-factor model cannot price correctly which penalizes managed futures given their low beta.
 - **Gold: no view.** No cashflow and no forward anchor (long-run real return $\approx$ inflation according to Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198))), so I express nothing and leave gold at its equilibrium prior.
 
 
-### The posterior
+### The posterior {#sec-posterior}
 
 The Black-Litterman model blends each view with the prior in inverse proportion to their uncertainties (Idzorek's confidence method, $\tau = 0.05$^[$\tau$ scales the prior's uncertainty level. A small $\tau$ makes the prior harder to depart from. 0.05 is the conventional value.]):
 
+I would hold each sleeve via an ETF a vehicle that charges fees. I deduct them here, from the posterior, rather than earlier from the views because a fee is not a belief about the market. The trend proxy data is already net of fees.
+
 ```{python}
 #| label: tbl-bl-posterior
-#| tbl-cap: "Black-Litterman prior, view, confidence, and posterior μ (real)."
-from black_litterman import VIEW_CONFIDENCES
+#| tbl-cap: "Black-Litterman prior, view, confidence, and posterior μ, before and after the vehicle's ongoing charge (real)."
+from black_litterman import VIEW_CONFIDENCES, vehicle_fees
 from mu import VIEWS_REAL
 
 bl_post = bl.posterior_returns(cov_final)
+bl_net = bl.posterior_net_returns(cov_final)
+_ters = vehicle_fees(cov_final.index)
 _rows = {}
 for _a in cov_final.index:
     _has_view = _a in VIEW_CONFIDENCES
@@ -387,6 +400,8 @@ for _a in cov_final.index:
         "view": f"{VIEWS_REAL[_a]:.2%}" if _has_view else "--",
         "confidence": f"{VIEW_CONFIDENCES[_a]:.1f}" if _has_view else "--",
         "posterior μ": f"{bl_post[_a]:.2%}",
+        "TER": f"{_ters[_a]:.2%}",
+        "net μ": f"{bl_net[_a]:.2%}",
     }
 pd.DataFrame(_rows).T.rename_axis("sleeve").reset_index().style.hide(axis="index")
 ```
@@ -396,24 +411,24 @@ This posterior is the MVO input. The posterior equity return is not far from my 
 
 # Determining the portfolio weights
 
-MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, and outputs the weights of the max-Sharpe portfolio also called the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio) (@tbl-tangency). The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem#One_risk-free_asset) can then be applied: since borrowing is allowed (via short box spreads), any investor's portfolio converges to using the tangency portfolio weights, and scales it using leverage to their own risk aversion level (more on that in the next section; remember @eq-challenge?).
+MVO is fed the posterior $\mu$ (@tbl-bl-posterior) and the covariance $\Sigma$, and outputs the weights of the max-Sharpe portfolio, also called the [tangency portfolio](https://en.wikipedia.org/wiki/Modern_portfolio_theory#Tangency_portfolio) (@tbl-tangency). Considering that lending & borrowing do not occur at the same insterest rates ($R_F$ & $R_B$, respectively) and that I'll be borrowing, not lending, the [two-fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) applies using $R_B$. So I feed MVO $R_B$ and lever up the resulting tangency portfolio to my risk aversion level (next section; remember @eq-challenge?).
 
 @tbl-mvo-inputs shows what the optimizer sees per sleeve next to the resulting weights.
 
 ```{python}
 #| label: tbl-mvo-inputs
-#| tbl-cap: "What MVO sees per sleeve: posterior return, volatility, Sharpe, and correlation with equity, next to the resulting tangency weight (real, financed at $R_F$ = 0.19 %)."
+#| tbl-cap: "What MVO sees per sleeve: net posterior return, volatility, Sharpe, and correlation with equity, next to the resulting tangency weight (real, considering the borrowing rate $R_B$)."
 from composition import tangency_weights
-from mu import RF_REAL
+from mu import BOX_REAL
 
 _vols = annualized_vols(cov_final)
-_w = tangency_weights(cov_final, bl_post)
+_w = tangency_weights(cov_final, bl_net, rf=BOX_REAL)
 pd.DataFrame(
     {
-        "posterior μ": bl_post.map("{:.2%}".format),
-        "excess (μ − RF)": (bl_post - RF_REAL).map("{:.2%}".format),
+        "net μ": bl_net.map("{:.2%}".format),
+        "excess (μ - R_B)": (bl_net - BOX_REAL).map("{:.2%}".format),
         "ann. vol. σ": _vols.map("{:.1%}".format),
-        "Sharpe": ((bl_post - RF_REAL) / _vols).map("{:.2f}".format),
+        "Sharpe": ((bl_net - BOX_REAL) / _vols).map("{:.2f}".format),
         "corr w/ equity": correlation(cov_final)["equity"].map("{:.2f}".format),
         "tangency weight": _w.map("{:.1%}".format),
     }
@@ -422,11 +437,12 @@ pd.DataFrame(
 
 ```{python}
 #| label: tbl-tangency
-#| tbl-cap: "The tangency portfolio: max-Sharpe of the Black-Litterman model's posterior returns and of the covariance matrix (real, financed at $R_F$ = 0.19 %)."
+#| tbl-cap: "The tangency portfolio: max-Sharpe of the Black-Litterman model's posterior returns and of the covariance matrix (real, considering the borrowing rate $R_B$)."
 from composition import portfolio_performance, tangency_weights
+from mu import BOX_REAL
 
-w_risky = tangency_weights(cov_final, bl_post)
-r_risky, s_risky, sh_risky = portfolio_performance(w_risky, bl_post, cov_final)
+w_risky = tangency_weights(cov_final, bl_net, rf=BOX_REAL)
+r_risky, s_risky, sh_risky = portfolio_performance(w_risky, bl_net, cov_final, rf=BOX_REAL)
 _row = {f"{sleeve} weight": f"{weight:.1%}" for sleeve, weight in w_risky.items()}
 _row.update({"E[r]": f"{r_risky:.1%}", "σ": f"{s_risky:.1%}", "Sharpe": f"{sh_risky:.2f}"})
 tang_vol_fmt = f"{s_risky:.0%}"
@@ -434,15 +450,13 @@ w_equity_fmt = f"{w_risky['equity']:.0%}"
 w_bonds_fmt = f"{w_risky['bonds']:.0%}"
 w_trend_fmt = f"{w_risky['trend']:.0%}"
 w_gold_fmt = f"{w_risky['gold']:.0%}"
-from mu import BOX_REAL
-box_fmt = f"{BOX_REAL:.2%}"
 pd.DataFrame([_row]).style.hide(axis="index")
 ```
 
 
 # Applying leverage {#sec-leverage}
 
-The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk level I should bear, given its Sharpe, to maximize utility, so I borrow to lever it up. I finance that borrowing with short box spreads at $R_B \approx$ `{python} box_fmt` real -- 3-month Euribor (2.524 %, [2026-08-21](https://www.euribor-rates.eu/en/current-euribor-rates/2/euribor-rate-3-months/)) plus 0.5 pp (as per the [Cayas](https://cayas.fr/le-journal/msci-world-assurance-vie-pilotee-allocation-cayas-meilleure)), minus ~2 % expected inflation.
+The tangency portfolio's volatility (~`{python} tang_vol_fmt`) is far below the risk level I should bear, given its Sharpe, to maximize utility, so I borrow to lever it up. I finance that borrowing with short box spreads at $R_B \approx$ `{python} box_fmt` real -- 3-month Euribor (2.524 %, [2026-08-21](https://www.euribor-rates.eu/en/current-euribor-rates/2/euribor-rate-3-months/)) plus 0.3 pp -- a realistic EUR box execution premium ([Cayas](https://cayas.fr/le-journal/msci-world-assurance-vie-pilotee-allocation-cayas-meilleure) considers Euribor 3M + 0.1 to 0.5 pp) -- minus ~2 % expected inflation.
 
 The optimal leverage ratio is solved the [Merton portfolio problem](https://en.wikipedia.org/wiki/Merton's_portfolio_problem). For the CRRA utility of the introduction, a single risky asset of expected return $\mu$ and volatility $\sigma$, and lending/borrowing at a risk-free rate $r$, Merton's solution is a constant optimal fraction of wealth in the risky asset,
 
@@ -456,7 +470,7 @@ $$
 k^* = \frac{\mu_p - R_B}{\gamma\,\sigma^2}
 $$
 
-Let $S = (\mu_p - R_B)/\sigma$ be the tangency's excess return per unit of risk over the borrowing rate (marginally below its risk-free Sharpe in @tbl-tangency, since $R_B > R_F$), so $\mu_p - R_B = S\sigma$. Substituting, we get
+Let $S = (\mu_p - R_B)/\sigma$ be the tangency's excess return per unit of risk over the borrowing rate (which corresponds to the Sharpe ratio in @tbl-tangency) so $\mu_p - R_B = S\sigma$. Substituting, we get
 
 $$
 k^* = \frac{S\sigma}{\gamma\,\sigma^2} = \frac{S}{\gamma\,\sigma}
@@ -531,7 +545,7 @@ from data import daily_returns_matrix
 
 returns_daily = daily_returns_matrix()
 daily_start = f"{returns_daily.index.min():%Y-%m}"
-daily_f = stress.EURIBOR3M_NOMINAL + 0.005  # base case: Euribor 3M + 0.5 pp
+daily_f = stress.EURIBOR3M_NOMINAL + 0.003
 daily_path = stress.simulate_path(returns_daily, w_risky, k, 0.0, daily_f, 63, periods_per_year=252)
 rho0_fmt = f"{1 / k:.1%}"
 kstar_fmt = f"{k:.2f}"
@@ -544,7 +558,7 @@ _boot = stress.bootstrap_grid(
     returns_daily,
     w_risky,
     k,
-    spreads=(0.005,),
+    spreads=(0.003,),
     rebalances=stress.DAILY_REBALANCE,
     bootstrap="stationary",
     block=63,
@@ -579,7 +593,7 @@ Simulated portfolio mechanics for the stress tests:
 - I use daily returns. The time range starts on `{python} daily_start`, covering the GFC, the March-2020 crash and the 2022 sell-off.
 - I don't apply dynamic, preventive deleveraging between rebalances, so the portfolio's margin ratio decreases after losses.
 - I reset the portfolio to the target leverage ratio $k$ and the asset weights quarterly (my plan) or annually (to see the cost of letting more drift occur)
-- I finance at the 3-month Euribor plus a pessimistic 0.5 pp (as defined in @sec-leverage).
+- I finance at the 3-month Euribor plus 0.3 pp (as defined in @sec-leverage).
 - We've been speaking in real terms so far but for the stress tests, given that a liquidation is a nominal event, we will speak in nominal terms and the short box spread loan will use a nominal rate rather than the real $R_B$ rate used so far.
 
 IBKR uses "risk-based margin" on European accounts, by default (cf. [here](https://www.interactivebrokers.ie/en/trading/margin-stocks.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104) for stocks and [here](https://www.interactivebrokers.ie/en/trading/margin-bonds.php?hm=eu&ex=eu&rgt=0&rsk=1&pm=0&rst=040404040404040104) for bonds). But, in practice, UCITS securities generally carry a 25 % maintenance margin ratio (cf. [this discussion](https://www.reddit.com/r/vosfinances/comments/1vh7lfr/ibkr_maintenance_margin_call/)), so a portfolio made entirely of them should face a 25 % maintenance requirement. But IBKR reserves the right to raise that requirement as it wishes (and it has done so in the past), so we'll also consider two higher levels (30 % & 35 %).
@@ -610,7 +624,7 @@ stress.historical_grid(
     returns_daily,
     w_risky,
     k,
-    spreads=(0.005,),
+    spreads=(0.003,),
     rebalances=stress.DAILY_REBALANCE,
     periods_per_year=252,
 ).drop(columns="financing").style.hide(axis="index")
@@ -654,7 +668,10 @@ ax2.annotate(
 )
 ax2.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
 ax2.set_ylabel("Margin ratio ρ")
-ax2.set_ylim(0.20, 0.72)
+_lo = min(daily_path.ratio.min(), 0.25)
+_hi = max(daily_path.ratio.max(), 0.35)
+_pad = 0.03 * (_hi - _lo)
+ax2.set_ylim(_lo - _pad, _hi + _pad)
 ax2.grid(True, axis="y", color="0.92")
 ax2.set_axisbelow(True)
 ax2.spines[["top", "right"]].set_visible(False)
@@ -680,7 +697,10 @@ for m_line in (0.25, 0.35):
     )
 ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
 ax.set_ylabel("Margin ratio ρ")
-ax.set_ylim(0.20, 0.62)
+_lo = min(_covid.min(), 0.25)
+_hi = max(_covid.max(), 0.35)
+_pad = 0.03 * (_hi - _lo)
+ax.set_ylim(_lo - _pad, _hi + _pad)
 ax.grid(True, axis="y", color="0.92")
 ax.set_axisbelow(True)
 ax.spines[["top", "right"]].set_visible(False)
@@ -698,4 +718,4 @@ Across 2000 30-year bootstrapped paths (using stationary bootstrapping, cf. Poli
 _boot.drop(columns="financing").style.hide(axis="index")
 ```
 
-So, at the CRRA-optimal $k =$ `{python} kstar_fmt`, the risk of forced liquidation is seems low. Though, this result is regime dependant, we would need more historical data to make it more robust. And the max drawdown is still substantial, but this is what my personal $\gamma$ accounts for already.
+So, at the CRRA-optimal $k =$ `{python} kstar_fmt`, the risk of forced liquidation is seems low. Though, this result is regime-dependant, we would need more historical data to make it more robust. And the max drawdown is still substantial, but this is what my personal $\gamma$ accounts for already.

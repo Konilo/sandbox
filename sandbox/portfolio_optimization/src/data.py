@@ -264,9 +264,9 @@ def hedge_tracking_check() -> pd.DataFrame:
             "from": f"{joined.index[0]:%Y-%m}",
             "to": f"{joined.index[-1]:%Y-%m}",
             "correlation": joined["study"].corr(joined["live"]),
-            "study (%/y)": annualized["study"],
-            "live (%/y)": annualized["live"],
-            "difference (bp/y)": (annualized["study"] - annualized["live"]) * 1e4,
+            "study (%/yr)": annualized["study"],
+            "live (%/yr)": annualized["live"],
+            "difference (bp/yr)": (annualized["study"] - annualized["live"]) * 1e4,
         }
     return pd.DataFrame(rows).T
 

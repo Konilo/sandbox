@@ -13,6 +13,7 @@ import pandas as pd
 from pypfopt import EfficientFrontier
 
 from covariance import final_covariance
+from leverage import GAMMA
 from mu import RF_REAL, expected_returns
 
 
@@ -47,3 +48,53 @@ def portfolio_performance(
     ret = float(mu.reindex(cov.index).values @ w)
     vol = float(np.sqrt(w @ cov.values @ w))
     return ret, vol, (ret - rf) / vol
+
+
+def _weight_lattice(units: int, n_assets: int) -> np.ndarray:
+    """Every non-negative integer vector of length ``n_assets`` summing to ``units``."""
+    if n_assets == 1:
+        return np.array([[units]])
+    blocks = []
+    for first in range(units + 1):
+        rest = _weight_lattice(units - first, n_assets - 1)
+        blocks.append(np.hstack([np.full((len(rest), 1), first), rest]))
+    return np.vstack(blocks)
+
+
+def optimal_weight_ranges(
+    cov: pd.DataFrame,
+    mu: pd.Series,
+    rf: float = RF_REAL,
+    gamma: float = GAMMA,
+    tolerance_bp: float = 10.0,
+    step: float = 0.01,
+) -> pd.DataFrame:
+    """Per sleeve, the weight range costing at most ``tolerance_bp`` of levered return.
+
+    A CRRA investor levering to ``k* = S / (gamma * sigma)`` earns
+    ``rf + S**2 / gamma``, so a Sharpe shortfall maps to a return shortfall in bp
+    and volatility drops out. Every long-only weight vector on the ``step``
+    lattice is enumerated and the best Sharpe at each level of each sleeve is
+    kept, which makes the result exact on that lattice and optimiser-free.
+    """
+    units = round(1 / step)
+    lattice = _weight_lattice(units, len(cov.index))
+    weights = lattice / units
+    variance = np.einsum("ij,jk,ik->i", weights, cov.values, weights)
+    sharpe = np.where(variance > 0, (weights @ mu.values - rf) / np.sqrt(variance), -np.inf)
+    loss_bp = (sharpe.max() ** 2 - sharpe**2) / gamma * 1e4
+
+    rows = {}
+    for i, sleeve in enumerate(cov.index):
+        within = np.full(units + 1, False)
+        for level in range(units + 1):
+            at_level = loss_bp[lattice[:, i] == level]
+            within[level] = at_level.size > 0 and at_level.min() <= tolerance_bp
+        peak = lattice[np.argmax(sharpe), i]
+        low = high = peak
+        while low > 0 and within[low - 1]:
+            low -= 1
+        while high < units and within[high + 1]:
+            high += 1
+        rows[sleeve] = {"low": low * step, "high": high * step}
+    return pd.DataFrame(rows).T

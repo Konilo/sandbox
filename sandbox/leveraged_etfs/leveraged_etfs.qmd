@@ -4,6 +4,7 @@ author: "Konilo Zio"
 date: "2025-08-03"
 execute:
     echo: false
+    freeze: true
 ---
 
 ```{r}
@@ -114,8 +115,9 @@ cl2 <- getSymbols(
     src = "yahoo",
     auto.assign = FALSE
 ) |> data.table(keep.rownames = TRUE)
+stopifnot(cl2[, mean(is.na(`CL2.PA.Close`))] < 0.01)
+cl2 <- cl2[!is.na(`CL2.PA.Close`)]
 stopifnot(cl2[`CL2.PA.Close` != `CL2.PA.Adjusted`, .N == 0]) # Stop if close != adjusted
-stopifnot(!cl2[, any(is.na(`CL2.PA.Close`))]) # Stop if there are missing values
 cl2 <- cl2[, .(index, `CL2.PA.Close`)]
 setnames(cl2, old = c("index", "CL2.PA.Close"), new = c("date", "cl2"))
 cl2[, date := as_date(date)]

@@ -2,7 +2,7 @@
 title: "Portfolio Optimization"
 author: "Konilo Zio"
 date: "2026-08-27"
-date-modified: "2026-08-27"
+date-modified: "2026-08-28"
 execute:
     echo: false
     freeze: true

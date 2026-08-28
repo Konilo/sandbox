@@ -2,7 +2,7 @@
 title: "Portfolio Optimization"
 author: "Konilo Zio"
 date: "2026-08-27"
-date-modified: "2026-08-27"
+date-modified: "2026-08-28"
 execute:
     echo: false
     freeze: true
@@ -613,6 +613,7 @@ A short box spread is a fixed-term, fixed-rate loan. But the borrowed cash is in
 Liquidation is triggered when your margin ratio falls below the maintenance margin ratio i.e., when the excess liquidity goes negative.
 
 Simulated portfolio mechanics for the stress tests:
+
 - The portfolio starts with a margin ratio $= 1/k =$ `{python} rho0_fmt`.
 - I use daily returns. The time range starts on `{python} daily_start`, covering the GFC, the March-2020 crash and the 2022 sell-off.
 - I don't apply dynamic, preventive deleveraging between rebalances, so the portfolio's margin ratio decreases after losses.

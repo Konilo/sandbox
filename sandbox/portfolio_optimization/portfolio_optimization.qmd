@@ -2,7 +2,7 @@
 title: "Portfolio Optimization"
 author: "Konilo Zio"
 date: "2026-08-27"
-date-modified: "2026-08-28"
+date-modified: "2026-08-29"
 execute:
     echo: false
     freeze: true
@@ -63,7 +63,7 @@ I have already defined the universe of assets I will consider and submit to the 
 - an [MSCI ACWI](https://www.msci.com/indexes/index/892400/msci-acwi-index) ETF such as [IUSQ](https://www.justetf.com/en/etf-profile.html?isin=IE00B6R52259) (0.20 % TER);
 - a EUR-hedged US Treasury 7-10 year bond ETF such as [CEMF](https://www.justetf.com/en/etf-profile.html?isin=IE000K1VI152) or [7USH](https://www.justetf.com/en/etf-profile.html?isin=LU1407888137) (0.10 & 0.06 % TER, respectively);
 - a [managed futures](https://www.aqr.com/Insights/Research/White-Papers/Understanding-Managed-Futures) ETF such as [DBMFE](https://www.imgp.com/fund/LU2951555403-imgp-dbi-managed-futures-fund-r-eur-ucits-etf/) (0.75 % TER) (ideally, several ones to diversify the manager risk);
-- and a gold ETF -- [PPFB](https://www.justetf.com/en/etf-profile.html?isin=IE00B4ND3602) (0.12 % TER).
+- and a gold ETF such as [PPFB](https://www.justetf.com/en/etf-profile.html?isin=IE00B4ND3602) (0.12 % TER).
 
 The definition of this universe is out of scope but was inspired, among others, by Ilmanen ([2022](https://www.wiley.com/en-us/shop/general-finance-investments/investing-amid-low-expected-returns-making-the-most-when-markets-offer-the-least-p-9781119860198)).
 

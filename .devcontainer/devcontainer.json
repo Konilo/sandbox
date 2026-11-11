@@ -41,5 +41,14 @@
         "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
         "source=gh-cli-config-${devcontainerId},target=/home/vscode/.config/gh,type=volume"
     ],
-    "remoteUser": "vscode"
+    "remoteUser": "vscode",
+    // renv library off the slow Windows bind mount
+    "containerEnv": {
+        "RENV_PATHS_LIBRARY": "/home/vscode/.local/share/renv/library"
+    },
+    // Activate the venv via env: terminal activation interrupts Quarto preview
+    "remoteEnv": {
+        "VIRTUAL_ENV": "${containerWorkspaceFolder}/.venv",
+        "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}"
+    }
 }

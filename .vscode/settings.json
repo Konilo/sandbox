@@ -1,6 +1,7 @@
 {
     "r.rterm.linux": "/usr/local/bin/R",
     "r.debugger.timeouts.startup": 100000,
+    "r.sessionWatcher": false,
     "quarto.render.previewType": "none",
     "workbench.browser.openLocalhostLinks": false,
     "[python]": {
@@ -11,7 +12,8 @@
             "source.organizeImports": "explicit"
         }
     },
-    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvironment": false,
+    "python-envs.terminal.autoActivationType": "off",
     "notebook.formatOnSave.enabled": true,
     "notebook.codeActionsOnSave": {
         "notebook.source.fixAll": "explicit"

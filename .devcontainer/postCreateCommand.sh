@@ -24,13 +24,6 @@ rm -rf renv/library
 echo 'Running renv::restore()'
 R -e "renv::restore(prompt = FALSE)"
 
-# Dev/exploratory R packages (not tracked by renv)
-echo 'Installing dev R packages'
-R -e "
-renv::install('languageserver', prompt = FALSE)
-install.packages('vscDebugger', repos = 'https://manuelhentschel.r-universe.dev')
-"
-
 # Python deps via uv
 echo 'Running uv sync'
 uv sync

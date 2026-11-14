@@ -1,0 +1,197 @@
+---
+title: "Short Box Spreads Theory"
+author: "Konilo Zio"
+date: "2026-11-11"
+execute:
+    echo: false
+---
+
+```{r}
+#| label: setup
+#| output: false
+
+# record t0 (see the appendix)
+t0 <- proc.time()
+
+# required packages
+library(data.table)
+library(ggplot2)
+library(knitr)
+
+# Runs when executing R interactively (because app/ is the workdir),
+# but not when rendering the qmd (because the qmd's dir is the workdir in that case)
+if (getwd() == "/workspaces/sandbox") {
+    setwd("sandbox/short_box_spreads")
+    library(httpgd)
+    httpgd::hgd()
+    # Plots will be displayed via a web page whose URL will be printed be the function above
+}
+```
+
+
+# Introduction {#sec-intro}
+
+The previous study -- [Portfolio Optimization](https://konilo.github.io/sandbox/sandbox/portfolio_optimization/portfolio_optimization.html) -- set out to design a portfolio optimized for utility maximization which requires solving @eq-challenge.
+
+$$
+\underbrace{\frac{\text{return}}{\text{risk}}}_{\text{to maximize}} \times \underbrace{\text{leverage}}_{\substack{\text{to adapt to my} \\ \text{risk aversion level}}}
+$$ {#eq-challenge}
+
+The tool used to borrow cash and lever up the portfolio is a specific combination of options called a short box spread. This is the topic of this study.
+
+Some key facts about short box spreads:
+
+- they act as fixed-rate loans: get $x$ today and pay back $y$ on a given date, with $x$, $y$, and the term date being known from the start and fixed, and $x < y$;
+    https://en.wikipedia.org/wiki/Box_spread
+    https://www.investopedia.com/terms/b/boxspread.asp
+    https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/
+- they are accessible to French citizens (via a compte-titres ordinaire from the most sophisticated brokers such as Interactive Brokers);
+    https://www.reddit.com/r/vosfinances/comments/1tqzjd4/cayas_meilleur_que_le_100_world/
+    https://cayas.fr/le-journal/ouvrir-et-configurer-son-compte-interactive-brokers
+- they surpass other forms of borrowing (such as consumer credit, lombard credit, leveraged ETFs) in terms of allocation constraints and rate, at the cost of additional complexity;
+    https://youtu.be/fYO19-YkulI
+- they require some expertise^[margin, options] and automated monitoring^[margin maintenance], which means that they are not suitable for all investors.
+
+
+# Semantics
+
+Find some fundamentals about options in Elton et al. ([2014](https://www.wiley.com/en-us/shop/general-finance-investments/modern-portfolio-theory-and-investment-analysis-9th-edition-p-9781118469941); chapter 23), for instance. The main terms used herein are defined in @tbl-semantics.
+
+| Term | Definition |
+|---|---|
+| Being long on an option | Having bought an option and holding it |
+| Being short on an option | Having sold an option (which is not yet expired or exercised), aka having written an option |
+| To long a call (LC) | Buying and holding a call |
+| To long a put (LP) | Buying and holding a put |
+| To short a call (SC) | Writing a call (which is not yet expired or exercised) |
+| To short a put (SP) | Writing a put (which is not yet expired or exercised) |
+| A box spread | (LC + SP) + (SC + LP), each parens being a leg |
+| Leg 1 of a box spread | LC + SP at the same strike i.e., a synthetic long forward (Gantin, [2026](https://www.investopedia.com/terms/s/synthetic-forward-contract.asp)) |
+| Leg 2 of a box spread | SC + LP at the same strike i.e., a synthetic short forward (ibid.) |
+| To short a box spread | Having sold a box spread, i.e., borrowing cash |
+| To long box spread | Having bought a box spread i.e., lending cash |
+: Semantics {#tbl-semantics}
+
+
+# Understanding a short box spread
+
+TODO i don't understand how the loan is repayed. are all the 4 options left to expire or be exercised? i think i've read that you repay by selling the same box you bought and IBKR recongizes that correspondance and closes both positions (??)
+
+## Variables
+
+The variables used in this deconstruction of short box spreads are defined as follows:
+
+- $K_1$ = the strike price of the 1st leg's options
+- $K_2$ = the strike price of the 2nd leg's options
+- $C_1$ = the premium of leg 1's call
+- $C_2$ = the premium of leg 2's call
+- $P_1$ = the premium of leg 1's put
+- $P_2$ = the premium of leg 2's put
+- $S_E$ = the price of the underlying security at expiration
+
+Options generally control 100 shares of the underlying security but the literature's standard doesn't include a $\times100$ factor ^[from my experience, at least]. For accuracy, the formulas herein consider options controlling a single share. This choice only affects the option premiums which are divided by 100 relative to the real ones.
+
+Also, box spreads must be implemented using [European options](https://en.wikipedia.org/wiki/Option_style). This study only considers options of this style.
+
+
+## Shorting leg 1 of the box spread
+
+| Part of the leg to short | Corresponding action | Now | At expiration | Ditto |
+|---|---|---|---|---|
+|  |  |  | If $S_E > K_1$ | If $S_E \leq K_1$ |
+| LC | Shorting a LC i.e., writing a call | $C_1$^[being paid the call's premium] | $(K_1 - S_E)$^[being paid the strike price by the holder in exchange for the security bought at the market price] | $0$ |
+| SP | Shorting a SP i.e., buying a put | $-P_1$^[paying the put's premium] | $0$ | $(K_1 - S_E)$^[buying the security at the market price and selling it to the writer at the strike price] |
+| Total |  | $C_1-P_1$ | $(K_1 - S_E)$ | $(K_1 - S_E)$ |
+: Shorting leg 1 of the box spread {#tbl-leg1}
+
+## Shorting leg 2 of the box spread
+
+| Part of the leg to short | Corresponding action | Now | At expiration | Ditto |
+|---|---|---|---|---|
+|  |  |  | If $S_E > K_2$ | If $S_E \leq K_2$ |
+| SC | Shorting a SC i.e., buying a call | $-C_2$ | $(S_E - K_2)$ | $0$ |
+| LP | Shorting a LP i.e., writing a put | $P_2$ | $0$ | $(S_E - K_2)$ |
+| Total |  | $-C_2+P_2$ | $(S_E - K_2)$ | $(S_E - K_2)$ |
+: Shorting leg 2 of the box spread {#tbl-leg2}
+
+
+## Solving the cashflows
+
+| Leg                   | Now                     | At expiration |
+| --------------------- | ----------------------- | ------------- |
+| 1: shorting (LC + SP) | $C_1-P_1$               | $(K_1 - S_E)$ |
+| 2: shorting (SC + LP) | $-C_2+P_2 = -(C_2-P_2)$ | $(S_E - K_2)$ |
+| Total                 | $C_1-P_1-(C_2-P_2)$     | $(K_1 - K_2)$ |
+: Putting it together {#tbl-together}
+
+The cashflow at expiration is now solved. But the cashflow "Now" is not, yet.
+
+In liquid markets, [put-call parity](https://en.wikipedia.org/wiki/Put%E2%80%93call_parity) Elton et al. ([2014](https://www.wiley.com/en-us/shop/general-finance-investments/modern-portfolio-theory-and-investment-analysis-9th-edition-p-9781118469941); chapter 23) teaches us that $$C = S_0 + P - \frac{K}{1+R}$$ where
+
+- $S_0$ = the stock price now (1 share)
+- $K$ = the strike price
+- assuming $R_L = R_B = R$. But apparently it's false. TODO.
+
+Hence $$C - P = S_0 - \frac{K}{1+R}$$
+Applying that to leg 1: $$C_1 - P_1 = S_0 - \frac{K_1}{1+R}$$
+And to leg 2: $$C_2 - P_2 = S_0 - \frac{K_2}{1+R}$$
+Substituting in the expression of the cashflow "Now" from the table above:
+$\text{new cashflow} = $C_1-P_1-(C_2-P_2)$$
+$$S_0 - \frac{K_1}{1+R} - \big(S_0 - \frac{K_2}{1+R}\big)$$
+$$S_0 - \frac{K_1}{1+R} - S_0 + \frac{K_2}{1+R}$$
+$$-\frac{K_1}{1+R} + \frac{K_2}{1+R}$$
+$$\frac{-K_1 + K_2}{1+R} = \frac{K_2-K_1}{1+R}$$
+
+
+## Putting it together
+
+Scaling back to the realistic 100-share-controlling options and assuming the legs are built such that $K_1 < K_2$, shorting a box spread:
+
+- initially provides $$\frac{100(K_2-K_1)}{1+R}$$; that's the present value of the difference between the two strikes, using the borrowing rate;
+- and costs $$100(K_1 - K_2)$$ at expiration; that's the (negative) difference between the two strikes.
+
+Receive a given amount today, and pay back more, eventually.
+
+
+# Sizing a short box spread loan
+
+- The amount owed at expiration date (= the **face** of the loan) is $$face = 100 \times N_{boxes} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from above into a, positive, amount]. It's controlled by both
+	- the strike width $K_1-K_2$ of the boxe(s)
+	- and the number of boxes sold $N_{boxes}$
+
+in both cases, the higher the
+
+- The amount obtained initially (= the loan's **principal**) is the present value of the face value $$principal=\frac{100N_{boxes}(K_2-K_1)}{1+R}$$
+- The **term** of the loan is defined by the expiration date of the options of the boxes (which must be identical)
+- The rate ($R$) is not under one's direct control -- it's implied and is a function of the market's risk free rate for the maturity chosen for the box (?? not yet understood, that's for later TODO). You can act on
+	- the maturity/expiration date of the options
+	- timing: shorting opportunistically when the market's implied rate on box spreads is favorable relative to other borrowing methods
+
+TODO payoff diagram
+
+
+# Other TODOs
+
+TODO rolling the box, sequence of events:
+- deposit
+- buy some etfs without margin
+- short box spread
+- invest the loan's cash into more etf shares
+- roll, rebalance, lever up/down
+
+TODO address the securities that are suited to box spread options on major currencies or stock indices futures e.g., SPX, ESTX50.
+https://en.wikipedia.org/wiki/Put%E2%80%93call_parity#Assumptions
+https://www.boxtrades.com/
+
+# Appendix
+
+This `qmd` took `r round((proc.time() - t0)[3] / 60)` minutes to render. It was rendered in the following environment:
+```{r}
+#| label: appendix
+
+print(sessionInfo(), locale = FALSE) |>
+    capture.output() |>
+    strwrap(width = 70, simplify = FALSE) |>
+    unlist() |>
+    cat(sep = "\n")
+```

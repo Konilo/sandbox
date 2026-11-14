@@ -74,9 +74,6 @@ Find some fundamentals about options in Elton et al. ([2014](https://www.wiley.c
 
 
 # Understanding a short box spread
-
-TODO i don't understand how the loan is repayed. are all the 4 options left to expire or be exercised? i think i've read that you repay by selling the same box you bought and IBKR recongizes that correspondance and closes both positions (??)
-
 ## Variables
 
 The variables used in this deconstruction of short box spreads are defined as follows:
@@ -94,26 +91,25 @@ Options generally control 100 shares of the underlying security but the literatu
 Also, box spreads must be implemented using [European options](https://en.wikipedia.org/wiki/Option_style). This study only considers options of this style.
 
 
-## Shorting leg 1 of the box spread
+## The payoff of each leg of a short box spread
 
 | Part of the leg to short | Corresponding action | Now | At expiration | Ditto |
 |---|---|---|---|---|
 |  |  |  | If $S_E > K_1$ | If $S_E \leq K_1$ |
-| LC | Shorting a LC i.e., writing a call | $C_1$^[being paid the call's premium] | $(K_1 - S_E)$^[being paid the strike price by the holder in exchange for the security bought at the market price] | $0$ |
-| SP | Shorting a SP i.e., buying a put | $-P_1$^[paying the put's premium] | $0$ | $(K_1 - S_E)$^[buying the security at the market price and selling it to the writer at the strike price] |
-| Total |  | $C_1-P_1$ | $(K_1 - S_E)$ | $(K_1 - S_E)$ |
+| LC | Shorting a LC i.e., writing a call | $C_1$^[being paid the call's premium] | $(K_1 - S_E)$^[paying the call's intrinsic value $S_E - K_1$ in cash (as it is in the money)] | $0$^[the call expires worthless] |
+| SP | Shorting a SP i.e., buying a put | $-P_1$^[paying the put's premium] | $0$^[the put expires worthless] | $(K_1 - S_E)$^[being paid the put's intrinsic value $K_1 - S_E$ in cash (as it is in the money)] |
+| Total |  | $C_1-P_1$ | $(K_1 - S_E)$^[same payoff in both cases: it's a synthetic short forward (which allows one to sell the underlying security for a fixed price on a given, future date)] | $(K_1 - S_E)$ |
 : Shorting leg 1 of the box spread {#tbl-leg1}
-
-## Shorting leg 2 of the box spread
 
 | Part of the leg to short | Corresponding action | Now | At expiration | Ditto |
 |---|---|---|---|---|
 |  |  |  | If $S_E > K_2$ | If $S_E \leq K_2$ |
-| SC | Shorting a SC i.e., buying a call | $-C_2$ | $(S_E - K_2)$ | $0$ |
-| LP | Shorting a LP i.e., writing a put | $P_2$ | $0$ | $(S_E - K_2)$ |
-| Total |  | $-C_2+P_2$ | $(S_E - K_2)$ | $(S_E - K_2)$ |
+| SC | Shorting a SC i.e., buying a call | $-C_2$^[paying the call's premium] | $(S_E - K_2)$^[being paid the call's intrinsic value $S_E - K_2$ in cash (as it is in the money)] | $0$^[the call expires worthless] |
+| LP | Shorting a LP i.e., writing a put | $P_2$^[being paid the put's premium] | $0$^[the put expires worthless] | $(S_E - K_2)$^[paying the put's intrinsic value $K_2 - S_E$ in cash (as it is in the money)] |
+| Total |  | $-C_2+P_2$ | $(S_E - K_2)$^[same payoff in both cases, it's a synthetic long forward (which allows one to buy the underlying security for a fixed price on a given, future date)] | $(S_E - K_2)$ |
 : Shorting leg 2 of the box spread {#tbl-leg2}
 
+While initiating a short box spread clearly consists in buying or selling calls and puts, the process to repay the resulting loan can be less intuitive and, I think, deserves some more explanations. A short box spread loan is generally repaid by letting its options be exercised or expire worthless on the expiration date. Settlement is made automatically in cash drawing from the CTO's cash^[or on margin if the cash balance is too low, which should be prevented by rolling the options earlier; more on that further down]. (Early repayment is also possible by going long on the same 4 options which cancels out the 8 options. It implies some rate risk, bid/ask spread costs, and trading fees.)
 
 ## Solving the cashflows
 
@@ -122,7 +118,7 @@ Also, box spreads must be implemented using [European options](https://en.wikipe
 | 1: shorting (LC + SP) | $C_1-P_1$               | $(K_1 - S_E)$ |
 | 2: shorting (SC + LP) | $-C_2+P_2 = -(C_2-P_2)$ | $(S_E - K_2)$ |
 | Total                 | $C_1-P_1-(C_2-P_2)$     | $(K_1 - K_2)$ |
-: Putting it together {#tbl-together}
+: Cashflows {#tbl-together}
 
 The cashflow at expiration is now solved. But the cashflow "Now" is not, yet.
 
@@ -155,7 +151,7 @@ Receive a given amount today, and pay back more, eventually.
 
 # Sizing a short box spread loan
 
-- The amount owed at expiration date (= the **face** of the loan) is $$face = 100 \times N_{boxes} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from above into a, positive, amount]. It's controlled by both
+- The amount owed at expiration date (= the **face** of the loan) is $$face = 100 \times N_{boxes} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from above into a positive amount]. It's controlled by both
 	- the strike width $K_1-K_2$ of the boxe(s)
 	- and the number of boxes sold $N_{boxes}$
 

@@ -88,7 +88,7 @@ The variables used in this deconstruction of short box spreads are defined as fo
 
 Options generally control 100 shares of the underlying security but the literature's standard doesn't include a $\times100$ factor ^[from my experience, at least]. For accuracy, the formulas herein consider options controlling a single share. This choice only affects the option premiums which are divided by 100 relative to the real ones.
 
-Also, box spreads must be implemented using [European options](https://en.wikipedia.org/wiki/Option_style). This study only considers options of this style.
+Box spreads must be implemented using [European](https://en.wikipedia.org/wiki/Option_style), [cash-settled](https://en.wikipedia.org/wiki/Option_(finance)#According_to_the_delivery_type) options. This study only considers options of this type.
 
 
 ## The payoff of each leg of a short box spread

@@ -57,11 +57,12 @@ Dockerfile2
 draft/
 .claude
 
+fi_decorrelation/
+cto_vs_pea/
+life_plan/
+
 # Quarto
 _site/
 .quarto/
 *.quarto_ipynb
-
-fi_decorrelation/
-cto_vs_pea/
-life_plan/
+/.quarto/

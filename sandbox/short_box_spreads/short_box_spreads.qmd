@@ -86,7 +86,7 @@ The variables used in this deconstruction of short box spreads are defined as fo
 - $P_2$ = the premium of leg 2's put
 - $S_E$ = the price of the underlying security at expiration
 
-Options generally control 100 shares of the underlying security but the literature's standard doesn't include a $\times100$ factor ^[from my experience, at least]. For accuracy, the formulas herein consider options controlling a single share. This choice only affects the option premiums which are divided by 100 relative to the real ones.
+Options control multiple shares of the underlying security (e.g., 100 or 10; we'll count this under the $m$ variable) but the literature's standard doesn't include a factor to account for this ^[from my experience, at least]. For accuracy, the formulas herein consider options controlling a single share. This choice only affects the option premiums which are divided by $m$ relative to the real ones.
 
 Box spreads must be implemented using [European](https://en.wikipedia.org/wiki/Option_style), [cash-settled](https://en.wikipedia.org/wiki/Option_(finance)#According_to_the_delivery_type) options. This study only considers options of this type.
 
@@ -120,54 +120,58 @@ While initiating a short box spread clearly consists in buying or selling calls 
 | Total                 | $C_1-P_1-(C_2-P_2)$     | $(K_1 - K_2)$ |
 : Cashflows {#tbl-together}
 
-The cashflow at expiration is now solved. But the cashflow "Now" is not, yet.
+The cashflow at expiration is now solved: $K_1 - K_2$, whatever $S_E$. But the cashflow "Now" is not, yet.
 
-In liquid markets, [put-call parity](https://en.wikipedia.org/wiki/Put%E2%80%93call_parity) Elton et al. ([2014](https://www.wiley.com/en-us/shop/general-finance-investments/modern-portfolio-theory-and-investment-analysis-9th-edition-p-9781118469941); chapter 23) teaches us that $$C = S_0 + P - \frac{K}{1+R}$$ where
+Longing a box spread pays a fixed amount on a given date: economically, the payoff is identical to the one of a [zero-coupon bond](https://en.wikipedia.org/wiki/Zero-coupon_bond). Hence, a short box spread behaves like a zero-coupon bond issued by a borrower: it provides some cash "Now" and costs another, larger amount ($K_2 - K_1$) at expiration. It ensues that the price "Now" is the present value of that future repayment: $$C_1-P_1-(C_2-P_2) = \frac{K_2-K_1}{(1+R)^T}$$ where
 
-- $S_0$ = the stock price now (1 share)
-- $K$ = the strike price
-- assuming $R_L = R_B = R$. But apparently it's false. TODO.
+- $T$ = the time to expiration of the options, in years
+- $R$ = the box spread's implied annual rate
 
-Hence $$C - P = S_0 - \frac{K}{1+R}$$
-Applying that to leg 1: $$C_1 - P_1 = S_0 - \frac{K_1}{1+R}$$
-And to leg 2: $$C_2 - P_2 = S_0 - \frac{K_2}{1+R}$$
-Substituting in the expression of the cashflow "Now" from the table above:
-$$\text{now cashflow} = $C_1-P_1-(C_2-P_2)$$
-$$\text{now cashflow} = S_0 - \frac{K_1}{1+R} - \big(S_0 - \frac{K_2}{1+R}\big)$$
-$$\text{now cashflow} = S_0 - \frac{K_1}{1+R} - S_0 + \frac{K_2}{1+R}$$
-$$\text{now cashflow} = -\frac{K_1}{1+R} + \frac{K_2}{1+R}$$
-$$\text{now cashflow} = \frac{-K_1 + K_2}{1+R} = \frac{K_2-K_1}{1+R}$$
+No option pricing model is needed to solve this. The underlying's price $S_0$, its volatility, and its dividends all cancel out because both legs share the same underlying and expiration date. Only the implied rate -- the discount rate -- remains unknown.
 
-TODO R is implied/unpredictable but it still gets fixed as soon as the box is setup. No surprises
+The market sets the price of the box (i.e., the four premiums), and $R$ is the rate implied by that price. $R$ is not predictable beforehand, but is fixed as soon as the orders are filled. The premiums land between the alternatives of both sides:
 
-TODO cover b/a spred & fees
+- lenders (longing the box spread) require $R$ above what they would otherwise earn on the currency in question e.g., the yield of German government bills/notes (Bubill/Schatz) or of US Treasury bills/notes of the same term;
+- borrowers (shorting the box spread) require $R$ below what they would otherwise pay on the same currency e.g., their broker's [margin rate](https://www.interactivebrokers.ie/en/trading/margin-rates.php) for EUR or USD.
+
+Empirically, $R$ lands slightly above the risk-free rate of the currency and term in question^[The following figures are ballpark indications: the implied rate of a given box can be computed from its quotes in one's own brokerage account before committing (see further down).]:
+
+- USD (options on the SPX index): the Treasury bill yield + 0.2 to 0.3 percentage points (pp) (ERN, [2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/));
+- EUR (options on the ESTX50 index): about 3.0 to 3.3% for 1-year boxes in November 2026 ([Yieldbard](https://yieldbard.com/), 2026); forum users report fills at IBKR's EUR reference rate curve + about 0.1 to 0.2 pp (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37)); and Cayas assumes Euribor 3 months + 0.1 to 0.5 pp in its backtests ([2026](https://cayas.fr/le-journal/msci-world-assurance-vie-pilotee-allocation-cayas-meilleure)).
+
+For comparison:
+- a broker's margin loan costs IBKR's reference benchmark rate^[A rate IBKR computes for each currency from "internationally recognized reference rates [...], bank deposit rates, and dynamic interbank rates" ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-benchmarks.php)); 2.485% for EUR on 12 Nov 2026.] + 1.5 pp up to €90k and + 1 point up to €900k, i.e., 3.99% and 3.49% in EUR on 15 Nov 2026 ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-rates.php));
+- and a lombard credit €STR + 0.7 to 1.95 pp (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462)).
+
+TODO cover fees
 
 
 ## Putting it together
 
-Scaling back to the realistic 100-share-controlling options and assuming the legs are built such that $K_1 < K_2$, shorting a box spread:
+Scaling back to real index options: their premiums and strikes are quoted in index points, and each contract pays a fixed currency amount per index point, its multiplier $m$ (100 USD for SPX options, 10 EUR for ESTX50 options, as per their contract's description provided by one's broker). For instance, an ESTX50 box spread with strikes 4150 and 8650 repays $10 \times (8650 - 4150) =$ €45,000 at expiration. Assuming the legs are built such that $K_1 < K_2$, shorting a box spread:
 
-- initially provides $$\frac{100(K_2-K_1)}{1+R}$$; that's the present value of the difference between the two strikes, using the borrowing rate;
-- and costs $$100(K_1 - K_2)$$ at expiration; that's the (negative) difference between the two strikes.
+- initially provides $$\frac{m(K_2-K_1)}{(1+R)^T}$$; that's the present value of the difference between the two strikes, using the borrowing rate;
+- and costs $$m(K_1 - K_2)$$ at expiration; that's the (negative) difference between the two strikes.
 
 Receive a given amount today, and pay back more, eventually.
 
-TODO compute the rate
+## Computing the rate
+
+Rearranging the equation for the cashflow "Now" gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points.
+
+The four options are traded together, as a single order with a single limit price for the whole box. Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
+
+- [boxtrades.com](https://www.boxtrades.com/) publishes the SPX box spread yield curve, derived from trades;
+- [Yieldbard](https://yieldbard.com/) publishes ESTX50 and SPX box spread yield curves and recent trades (the EUR curve is not derived from trades but from closing prices);
+- IBKR's TWS shows its reference EUR and USD rate curves^[New Window > Option Analysis > Interactive Analytics > Interest Rate; used as such by forum members ([Cayas forum, 2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37))].
+- the [Box tab of Portfolio Construction](https://portfolio-construction.freeboxos.fr/?section=box.interest-rate-swap-curves#box) takes a target rate and returns the corresponding limit price.
 
 
 # Sizing a short box spread loan
 
-- The amount owed at expiration date (= the **face** of the loan) is $$face = 100 \times N_{boxes} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from above into a positive amount]. It's controlled by both
+- The amount owed at expiration date (= the **face** of the loan) is $$face = m \times N_{boxes} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from above into a positive amount]. It's controlled by both
 	- the strike width $K_1-K_2$ of the boxe(s)
 	- and the number of boxes sold $N_{boxes}$
-
-in both cases, the higher the
-
-- The amount obtained initially (= the loan's **principal**) is the present value of the face value $$principal=\frac{100N_{boxes}(K_2-K_1)}{1+R}$$
-- The **term** of the loan is defined by the expiration date of the options of the boxes (which must be identical)
-- The rate ($R$) is not under one's direct control -- it's implied and is a function of the market's risk free rate for the maturity chosen for the box (?? not yet understood, that's for later TODO). You can act on
-	- the maturity/expiration date of the options
-	- timing: shorting opportunistically when the market's implied rate on box spreads is favorable relative to other borrowing methods
 
 TODO payoff diagram
 

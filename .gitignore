@@ -55,9 +55,13 @@ Dockerfile2
 *.html
 *_files/
 draft/
+.claude
 
 # Quarto
 _site/
 .quarto/
+*.quarto_ipynb
 
-/.quarto/
+fi_decorrelation/
+cto_vs_pea/
+life_plan/

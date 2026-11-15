@@ -68,7 +68,7 @@ Find some fundamentals about options in Elton et al. ([2014](https://www.wiley.c
 | A box spread | (LC + SP) + (SC + LP), each parens being a leg |
 | Leg 1 of a box spread | LC + SP at the same strike i.e., a synthetic long forward (Gantin, [2026](https://www.investopedia.com/terms/s/synthetic-forward-contract.asp)) |
 | Leg 2 of a box spread | SC + LP at the same strike i.e., a synthetic short forward (ibid.) |
-| To short a box spread | Having sold a box spread, i.e., borrowing cash |
+| To short a box spread | Having sold a box spread, i.e., borrowing cash^[A broker may present this trade as *buying* the reversed combination of options at a negative price: shorting a combination (to short (LC + SP) + (SC + LP)) is synonmous to buying its reverse (to long (SC + LP) + (LC + SP)).] |
 | To long box spread | Having bought a box spread i.e., lending cash |
 : Semantics {#tbl-semantics}
 
@@ -132,11 +132,15 @@ Hence $$C - P = S_0 - \frac{K}{1+R}$$
 Applying that to leg 1: $$C_1 - P_1 = S_0 - \frac{K_1}{1+R}$$
 And to leg 2: $$C_2 - P_2 = S_0 - \frac{K_2}{1+R}$$
 Substituting in the expression of the cashflow "Now" from the table above:
-$\text{new cashflow} = $C_1-P_1-(C_2-P_2)$$
-$$S_0 - \frac{K_1}{1+R} - \big(S_0 - \frac{K_2}{1+R}\big)$$
-$$S_0 - \frac{K_1}{1+R} - S_0 + \frac{K_2}{1+R}$$
-$$-\frac{K_1}{1+R} + \frac{K_2}{1+R}$$
-$$\frac{-K_1 + K_2}{1+R} = \frac{K_2-K_1}{1+R}$$
+$$\text{now cashflow} = $C_1-P_1-(C_2-P_2)$$
+$$\text{now cashflow} = S_0 - \frac{K_1}{1+R} - \big(S_0 - \frac{K_2}{1+R}\big)$$
+$$\text{now cashflow} = S_0 - \frac{K_1}{1+R} - S_0 + \frac{K_2}{1+R}$$
+$$\text{now cashflow} = -\frac{K_1}{1+R} + \frac{K_2}{1+R}$$
+$$\text{now cashflow} = \frac{-K_1 + K_2}{1+R} = \frac{K_2-K_1}{1+R}$$
+
+TODO R is implied/unpredictable but it still gets fixed as soon as the box is setup. No surprises
+
+TODO cover b/a spred & fees
 
 
 ## Putting it together
@@ -147,6 +151,8 @@ Scaling back to the realistic 100-share-controlling options and assuming the leg
 - and costs $$100(K_1 - K_2)$$ at expiration; that's the (negative) difference between the two strikes.
 
 Receive a given amount today, and pay back more, eventually.
+
+TODO compute the rate
 
 
 # Sizing a short box spread loan

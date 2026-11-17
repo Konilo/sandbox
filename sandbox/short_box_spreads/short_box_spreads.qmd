@@ -250,6 +250,39 @@ p_options / p_legs / p_box + plot_layout(heights = c(2, 1, 1))
 ```
 
 
+# Choosing the underlying
+
+Box spreads can be built on any options, but few suit a loan. The criteria are:
+
+| Criterion | Why it matters |
+|---|---|
+| European exercise | No early assignment, which would break the box before its term |
+| Cash settlement | No delivery of the underlying at expiration, just a cash debit |
+| Currency | The loan is denominated in the options' currency (see further down) |
+| Liquidity | Determines whether limit orders near [fair value](https://www.investopedia.com/terms/f/fairvalue.asp) get executed, hence the rate |
+| Available expirations | Bounds the possible range of loan terms |
+| Multiplier $\times$ strike range | Sets the loan size per box, hence its granularity and maximum |
+: Criteria for choosing a box spread's underlying {#tbl-criteria}
+
+In practice, these criteria point to cash-settled European options on major stock indices. Options on single stocks and ETFs (e.g., SPY) are American-style and physically settled, which rules them out. So do most options on futures and on currencies, for the same reasons.
+
+| Underlying | Exchange | Trading class | Multiplier | Currency of the loan |
+|---|---|---|---|---|
+| S&P 500 | Cboe | SPX | 100 USD | USD |
+| Euro Stoxx 50 | Eurex | OESX | 10 EUR | EUR |
+| FTSE 100 | ICE Futures Europe | ESX | 10 GBP^[Shown as 1,000 by IBKR because premiums are quoted in pence: 1,000 pence = 10 GBP per index point.] | GBP |
+| Nikkei 225 | Osaka Exchange | 225 | 1,000 JPY | JPY |
+: Main underlyings for box spread loans; all four are European-style and cash-settled (IBKR contract descriptions, November 2026) {#tbl-underlyings}
+
+SPX has by far the deepest box market, with expirations up to about five years ([boxtrades.com](https://www.boxtrades.com/)). ESTX50 is the main EUR option, with liquid boxes up to about two and a half years ([Yieldbard](https://yieldbard.com/)).
+
+## The currency
+
+The currency is the criterion that prevents a single best choice from existing. A loan is a short position on its currency: if that currency appreciates against the currency of the assets bought with the loan, the debt grows relative to the portfolio. For instance, a EUR investor who borrows USD via SPX box spreads to buy EUR-denominated assets bets that the USD won't appreciate against the EUR.
+
+To borrow cash while avoiding that risk, one can borrow in the currencies they invest the borrowed cash in, in the same proportions (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/s/2KQFH4E4a9)). This costs more complexity (more boxes to roll), and the rates differ between currencies.
+
+
 # Other TODOs
 
 TODO rolling the box, sequence of events:
@@ -258,10 +291,6 @@ TODO rolling the box, sequence of events:
 - short box spread
 - invest the loan's cash into more etf shares
 - roll, rebalance, lever up/down
-
-TODO address the securities that are suited to box spread options on major currencies or stock indices futures e.g., SPX, ESTX50.
-https://en.wikipedia.org/wiki/Put%E2%80%93call_parity#Assumptions
-https://www.boxtrades.com/
 
 # Appendix
 

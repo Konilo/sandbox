@@ -17,6 +17,7 @@ t0 <- proc.time()
 library(data.table)
 library(ggplot2)
 library(knitr)
+library(patchwork)
 
 # Runs when executing R interactively (because app/ is the workdir),
 # but not when rendering the qmd (because the qmd's dir is the workdir in that case)
@@ -173,7 +174,80 @@ The four options are traded together, as a single order with a single limit pric
 	- the strike width $K_1-K_2$ of the boxe(s)
 	- and the number of boxes sold $N_{boxes}$
 
-TODO payoff diagram
+```{r}
+#| label: fig-payoff
+#| fig-cap: "Cashflows at expiration of a short ESTX50 box spread with $K_1 = 4150$ and $K_2 = 8650$, in index points per box (× 10 EUR). Whatever $S_E$, the box costs $K_2 - K_1 = 4500$ points (€45,000) at expiration; the cash received now, $4500 / 1.03$ ≈ 4369 points (≈ €43,689), assumes a 1-year term at a 3% rate."
+#| fig-width: 7
+#| fig-height: 10
+
+K1 <- 4150
+K2 <- 8650
+R  <- 0.03 # illustrative 1-year rate, for the cash received now
+S  <- seq(3000, 10000, by = 10)
+
+colors <- c("Leg 1" = "#2a78d6", "Leg 2" = "#eb6834", "Box" = "#3d3d3a")
+options_order <- c("Leg 1: short call K1", "Leg 1: long put K1", "Leg 2: long call K2", "Leg 2: short put K2")
+
+options_dt <- rbindlist(list(
+    data.table(group = "Leg 1", line = options_order[1], S = S, y = -pmax(S - K1, 0)),
+    data.table(group = "Leg 1", line = options_order[2], S = S, y =  pmax(K1 - S, 0)),
+    data.table(group = "Leg 2", line = options_order[3], S = S, y =  pmax(S - K2, 0)),
+    data.table(group = "Leg 2", line = options_order[4], S = S, y = -pmax(K2 - S, 0))
+))
+options_dt[, line := factor(line, levels = options_order)]
+legs_dt <- rbindlist(list(
+    data.table(group = "Leg 1", line = "leg 1: K1 - S_E", S = S, y = K1 - S),
+    data.table(group = "Leg 2", line = "leg 2: S_E - K2", S = S, y = S - K2)
+))
+box_dt <- rbindlist(list(
+    data.table(group = "Box", line = sprintf("repaid at expiration: K1 - K2 = %s points (€%s)", format(K1 - K2, big.mark = ","), format(10 * (K2 - K1), big.mark = ",")), type = "solid", S = S, y = K1 - K2),
+    data.table(group = "Box", line = sprintf("received now: (K2 - K1) / (1 + R) ≈ %s points (≈ €%s)", format(round((K2 - K1) / (1 + R)), big.mark = ","), format(round(10 * (K2 - K1) / (1 + R)), big.mark = ",")), type = "dashed", S = S, y = (K2 - K1) / (1 + R))
+))
+
+y_limits <- range(c(options_dt$y, legs_dt$y, box_dt$y))
+base_layers <- list(
+    geom_hline(yintercept = 0, color = "grey70", linewidth = 0.4),
+    geom_vline(xintercept = c(K1, K2), color = "grey70", linetype = "dotted"),
+    scale_color_manual(values = colors, guide = "none"),
+    scale_x_continuous(breaks = c(K1, K2), labels = c("K1", "K2")),
+    scale_y_continuous(limits = y_limits, expand = expansion(mult = 0.15)),
+    labs(x = expression(S[E]), y = "points"),
+    theme_minimal(base_size = 10),
+    theme(
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(hjust = 0),
+        plot.title = element_text(face = "bold", size = 11)
+    )
+)
+
+p_options <- ggplot(options_dt, aes(S, y, color = group)) +
+    geom_line(linewidth = 0.9) +
+    facet_wrap(~line, ncol = 2) +
+    ggtitle("1. The four options") +
+    base_layers
+
+p_legs <- ggplot(legs_dt, aes(S, y, color = group)) +
+    geom_line(linewidth = 0.9) +
+    geom_text(
+        data = legs_dt[, .SD[which.max(S)], by = line],
+        aes(label = line, vjust = fifelse(y < 0, 1.6, -0.6)),
+        hjust = 1, size = 3, color = "grey20"
+    ) +
+    ggtitle("2. The two legs (sums of their options)") +
+    base_layers
+
+p_box <- ggplot(box_dt, aes(S, y, color = group)) +
+    geom_line(aes(linetype = type), linewidth = 0.9) +
+    geom_text(
+        data = box_dt[, .SD[which.min(abs(S - (K1 + K2) / 2))], by = line],
+        aes(label = line), vjust = 1.6, size = 3, color = "grey20"
+    ) +
+    scale_linetype_identity() +
+    ggtitle("3. The box (sum of the legs)") +
+    base_layers
+
+p_options / p_legs / p_box + plot_layout(heights = c(2, 1, 1))
+```
 
 
 # Other TODOs

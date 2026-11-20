@@ -18,5 +18,14 @@
     "notebook.codeActionsOnSave": {
         "notebook.source.fixAll": "explicit"
     },
-    "r.rpath.linux": "/usr/local/bin/R"
+    "r.rpath.linux": "/usr/local/bin/R",
+    "python.analysis.exclude": [
+        "**/.venv",
+        "**/__pycache__",
+        "**/renv",
+        "_site",
+        "_freeze",
+        ".quarto",
+        ".ruff_cache"
+    ]
 }

@@ -110,9 +110,9 @@ Box spreads must be implemented using [European](https://en.wikipedia.org/wiki/O
 | Total |  | $-C_2+P_2$ | $(S_E - K_2)$^[same payoff in both cases, it's a synthetic long forward (which allows one to buy the underlying security for a fixed price on a given, future date)] | $(S_E - K_2)$ |
 : Shorting leg 2 of the box spread {#tbl-leg2}
 
-While initiating a short box spread clearly consists in buying or selling calls and puts, the process to repay the resulting loan can be less intuitive and, I think, deserves some more explanations. A short box spread loan is generally repaid by letting its options be exercised or expire worthless on the expiration date. Settlement is made automatically in cash drawing from the CTO's cash^[or on margin if the cash balance is too low, which should be prevented by rolling the options earlier; more on that further down]. (Early repayment is also possible by going long on the same 4 options which cancels out the 8 options. It implies some rate risk, bid/ask spread costs, and trading fees.)
+While initiating a short box spread clearly consists in buying or selling calls and puts, the process to repay the resulting loan can be less intuitive and, I think, deserves some more explanations. A short box spread loan is generally repaid by letting its options be exercised or expire worthless on the expiration date. Settlement is made automatically in cash drawing from the CTO's cash^[or on margin if the cash balance is too low, which should be prevented by rolling the options earlier; more on that in @sec-rolling]. (Early repayment is also possible by going long on the same 4 options which cancels out the 8 options. It implies some rate risk, bid/ask spread costs, and trading fees.)
 
-## Solving the cashflows
+## Solving the cashflows {#sec-solving-cashflows}
 
 | Leg                   | Now                     | At expiration |
 | --------------------- | ----------------------- | ------------- |
@@ -135,7 +135,7 @@ The market sets the price of the box spread (i.e., the four premiums), and $R$ i
 - lenders (longing the box spread) require $R$ above what they would otherwise earn on the currency in question e.g., the yield of German government bills/notes (Bubill/Schatz) or of US Treasury bills/notes of the same term;
 - borrowers (shorting the box spread) require $R$ below what they would otherwise pay on the same currency e.g., the interest rate of their broker's [margin loans](https://www.interactivebrokers.ie/en/trading/margin-rates.php) for EUR or USD.
 
-Empirically, $R$ lands slightly above the risk-free rate of the currency and term in question^[The following figures are ballpark indications: the implied rate of a given box spread can be computed from its quotes in one's own brokerage account before committing (see further down).]:
+Empirically, $R$ lands slightly above the risk-free rate of the currency and term in question^[The following figures are ballpark indications: the implied rate of a given box spread can be computed from its quotes in one's own brokerage account before committing (see @sec-computing-rate).]:
 
 - USD (options on the SPX index): the Treasury bill yield + 0.2 to 0.3 percentage points (pp) (ERN, [2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/));
 - EUR (options on the ESTX50 index): about 3.0 to 3.3 % for 1-year box spreads in November 2026 ([Yieldbard](https://yieldbard.com/), 2026); forum users report fills at IBKR's EUR reference rate curve + about 0.1 to 0.2 pp (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37)); and Cayas assumes Euribor 3 months + 0.1 to 0.5 pp in its backtests ([2026](https://cayas.fr/le-journal/msci-world-assurance-vie-pilotee-allocation-cayas-meilleure)).
@@ -156,7 +156,7 @@ Scaling back to real index options: their premiums and strikes are quoted in ind
 
 Receive a given amount today, and pay back more, eventually.
 
-## Computing the rate
+## Computing the rate {#sec-computing-rate}
 
 Rearranging the equation for the cashflow "Now" gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points.
 
@@ -170,9 +170,9 @@ The four options are traded together, as a single order with a single limit pric
 
 # Sizing a short box spread loan
 
-- The amount owed at expiration date (= the **face** of the loan) is $$face = m \times N_{box spreads} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from above into a positive amount]. It's controlled by both
+- The amount owed at expiration date (= the **face** of the loan) is $$face = m \times N_{\text{box spreads}} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from @tbl-together into a positive amount]. It's controlled by both
 	- the strike width $K_1-K_2$ of the boxe(s)
-	- and the number of box spreads sold $N_{box spreads}$
+	- and the number of box spreads sold $N_{\text{box spreads}}$
 
 ```{r}
 #| label: fig-payoff
@@ -182,16 +182,16 @@ The four options are traded together, as a single order with a single limit pric
 
 K1 <- 4150
 K2 <- 8650
-R  <- 0.03 # illustrative 1-year rate, for the cash received now
-S  <- seq(3000, 10000, by = 10)
+R <- 0.03 # illustrative 1-year rate, for the cash received now
+S <- seq(3000, 10000, by = 10)
 
 colors <- c("Leg 1" = "#2a78d6", "Leg 2" = "#eb6834", "Box" = "#3d3d3a")
 options_order <- c("Leg 1: short call K1", "Leg 1: long put K1", "Leg 2: long call K2", "Leg 2: short put K2")
 
 options_dt <- rbindlist(list(
     data.table(group = "Leg 1", line = options_order[1], S = S, y = -pmax(S - K1, 0)),
-    data.table(group = "Leg 1", line = options_order[2], S = S, y =  pmax(K1 - S, 0)),
-    data.table(group = "Leg 2", line = options_order[3], S = S, y =  pmax(S - K2, 0)),
+    data.table(group = "Leg 1", line = options_order[2], S = S, y = pmax(K1 - S, 0)),
+    data.table(group = "Leg 2", line = options_order[3], S = S, y = pmax(S - K2, 0)),
     data.table(group = "Leg 2", line = options_order[4], S = S, y = -pmax(K2 - S, 0))
 ))
 options_dt[, line := factor(line, levels = options_order)]
@@ -258,7 +258,7 @@ Box spreads can be built on any options, but few suit a loan. The criteria are:
 |---|---|
 | European exercise | No early assignment, which would break the box spread before its term |
 | Cash settlement | No delivery of the underlying at expiration, just a cash debit |
-| Currency | The loan is denominated in the options' currency (see further down) |
+| Currency | The loan is denominated in the options' currency (see @sec-currency) |
 | Liquidity | Determines whether limit orders near [fair value](https://www.investopedia.com/terms/f/fairvalue.asp) get executed, hence the rate |
 | Available expirations | Bounds the possible range of loan terms |
 | Multiplier $\times$ strike range | Sets the loan size per box spread, hence its granularity and maximum |
@@ -276,7 +276,7 @@ In practice, these criteria point to cash-settled European options on major stoc
 
 SPX has by far the deepest box spread market, with expirations up to about five years ([boxtrades.com](https://www.boxtrades.com/)). ESTX50 is the main EUR option, with liquid box spreads up to about two and a half years ([Yieldbard](https://yieldbard.com/)).
 
-## The currency
+## The currency {#sec-currency}
 
 The currency is the criterion that prevents a single best choice from existing. A loan is a short position on its currency: if that currency appreciates against the currency of the assets bought with the loan, the debt grows relative to the portfolio. For instance, a EUR investor who borrows USD via SPX box spreads to buy EUR-denominated assets bets that the USD won't appreciate against the EUR.
 
@@ -306,7 +306,7 @@ With
 
 the broker liquidates positions as soon as the equity falls below the maintenance margin requirement. The equity being the assets minus the debt, the drawdown $d^*$ triggering liquidation solves
 $$\underbrace{A_0(1-d^*) - D}_{\text{equity}} = \underbrace{m \, A_0(1-d^*)}_{\text{maintenance margin requirement}}$$
-$$d^* = 1 - \frac{1 - 1/L}{1 - m}$$
+$$d^* = 1 - \frac{1 - 1/L}{1 - m}$$ {#eq-dstar}
 
 ```{r}
 #| label: tbl-liquidation
@@ -326,21 +326,62 @@ At IBKR, UCITS ETFs typically have a maintenance margin ratio of 25 % (r/vosfina
 
 An instrument's maintenance margin ratio isn't fixed: IBKR "can increase its 'house' maintenance margin requirements at any time" often with immediate effect, and no upper limit ([IBKR Ireland](https://www.lynxbroker.com/media/doc/IBIE/4761_IBIE_DISCLOSURE_OF_RISKS_OF_MARGIN_TRADING_ENG.pdf), 2020). Precedents include market-wide increases of about 35 % (e.g., from 25 % to about 34 %) around the 2020 US election, and increases on specific instruments up to 87 % or 100 % (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1vh7lfr/ibkr_maintenance_margin_call/)).
 
-Setting $d^* = 0$ in the formula above shows that an increase alone, without any market move, triggers liquidation as soon as $m \geq 1/L$, e.g., $m \geq 50\,\%$ at $2\times$ leverage. This argues for (i) keeping the leverage well below what market drawdowns alone would allow, (ii) for spreading the assets over several instruments, so that an increase on one of them affects the account's maintenance margin requirement only in proportion to its weight, and (iii) for favoring large, liquid instruments, to avoid the add-ons IBKR's risk-based model applies to concentrated, illiquid, or volatile positions ([IBKR](https://www.interactivebrokers.com/lib/cstools/faq/content/1163246347)).
+Setting $d^* = 0$ in @eq-dstar shows that an increase alone, without any market move, triggers liquidation as soon as $m \geq 1/L$, e.g., $m \geq 50\,\%$ at $2\times$ leverage. This argues for (i) keeping the leverage well below what market drawdowns alone would allow, (ii) for spreading the assets over several instruments, so that an increase on one of them affects the account's maintenance margin requirement only in proportion to its weight, and (iii) for favoring large, liquid instruments, to avoid the add-ons IBKR's risk-based model applies to concentrated, illiquid, or volatile positions ([IBKR](https://www.interactivebrokers.com/lib/cstools/faq/content/1163246347)).
 
 ## Liquidation
 
 IBKR liquidates positions automatically, at market, as soon as the excess liquidity (the equity minus the maintenance margin requirement) goes negative, without letting the client choose which positions are sold (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/omn1ijx/); [IBKR Ireland](https://www.lynxbroker.com/media/doc/IBIE/4761_IBIE_DISCLOSURE_OF_RISKS_OF_MARGIN_TRADING_ENG.pdf), 2020). This can break a short box spread position, resulting in an uncertain, potentially damaging payoff. Hence the need for automated monitoring on the excess liquidity.
 
 
-# Other TODOs
+# Lifecycle of a levered portfolio
 
-TODO rolling the box, sequence of events:
-- deposit
-- buy some etfs without margin
-- short box spread
-- invest the loan's cash into more etf shares
-- roll, rebalance, lever up/down
+## Setting up
+
+The sequence of actions to lever up a portfolio with short box spreads is:
+
+1. deposit cash in the CTO;
+2. buy ETFs, without leverage;
+3. short one box spread per currency of exposure (see @sec-currency);
+4. invest the cash obtained into more ETF shares.
+
+Buying the ETFs first means the equity exists before the loan, and the order preview of each short box spread shows its impact on the margin requirements before committing. The cash obtained should then be invested quickly: until then, it is uninvested cash which earns the broker's credit interest rate ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/pricing-interest-rates.php)), lower than the box spread's rate.
+
+## Rolling {#sec-rolling}
+
+To keep the leverage beyond the term of a short box spread, one shorts a new one with a later expiration date, a few days or weeks before the old one expires. At expiration, the old one settles and its repayment is debited from the new one's cash. Waiting until the last day is damaging but not dramatic on the short term: if the new order isn't filled in time, the repayment is drawn on margin, at the broker's margin loan interest rate (e.g., 3.9 % vs about 3.0 to 3.3 % for box spreads in EUR, see @sec-solving-cashflows).
+
+The new short box spread must provide at least the old one's face. Since each roll borrows the previous face, which includes the interest, the debt grows by the interest at each roll unless part of it is repaid with cash.
+
+Laddering consists in splitting the debt across several short box spreads with staggered expiration dates e.g., four 1-year box spreads, one expiring each quarter. Each quarter, a quarter of the debt is rolled. The benefits are:
+
+- each roll is an opportunity to resize the debt without closing a box spread early; with quarterly expirations, this matches a quarterly rebalancing;
+- a roll that fails to get filled in time only affects a fraction of the debt;
+- the debt's rate is averaged over several dates instead of depending on a single day's market.
+
+And the costs is additional complexity: four (in our example) short box spreads to monitor and roll^[times the number of currencies one borrows in].
+
+## Rebalancing
+
+The leverage ratio evolves with the market: it increases when the assets fall, and decreases when they rally. It's reset to its target at each (e.g., quarterly) roll-rebalancing:
+
+- to lever up, borrow more than before and invest the newly borrowed cash;
+- to delever, sell ETFs and borrow less than before.
+
+Delevering implies a few more steps and can be time-sensitive in case of crisis (liquidation risk), so let's expand.
+
+- One delevers by selling ETFs e.g., for an amount $S$. The account's equity doesn't change (ETF shares are swapped for their worth in cash), but:
+    - the maintenance margin requirement decreases by $m \times S$, since the sold ETF shares contributed to it while cash doesn't (the excess liquidity increases by as much);
+    - the leverage ratio decreases from $A/E$ to $(A - S)/E$, with $A$ the ETFs' value and $E$ the equity: the debt is still there, but the cash now offsets $S$ of it.
+- Actually repaying the debt can wait. Two possible sequences of actions to delever:
+    - In normal times, the debt is reduced at a roll:
+        1. pick the target debt, e.g., the old face minus 10 k€;
+        2. sell 10 k€ of ETFs, close to the roll date since the resulting uninvested cash only earns the broker's interest rate on cash until then;
+        3. short the new box spread for the reduced face;
+        4. at expiration, the old short box spread's repayment is covered by the new one's cash plus the 10 k€.
+    - In case of liquidation risk between two rolls:
+        1. immediately sell ETFs with limit orders before the broker liquidates any position itself at market;
+        2. once markets calm down, either reduce the debt at the next roll as above, or close the short box spread(s) early by longing the same box spread(s) if the cost of holding the uninvested cash until expiration (the uninvested cash times the gap between the box spread's rate and the interest rate on cash, over the remaining term) exceeds the cost of closing (a bid/ask spread and order fees).
+
 
 # Appendix
 

@@ -1,5 +1,5 @@
 ---
-title: "Short Box Spreads Theory"
+title: "Short Box Spreads"
 author: "Konilo Zio"
 date: "2026-11-11"
 execute:
@@ -123,7 +123,7 @@ While initiating a short box spread clearly consists in buying or selling calls 
 
 The cashflow at expiration is now solved: $K_1 - K_2$, whatever $S_E$. But the cashflow "Now" is not, yet.
 
-Longing a box spread pays a fixed amount on a given date: economically, the payoff is identical to the one of a [zero-coupon bond](https://en.wikipedia.org/wiki/Zero-coupon_bond). Hence, a short box spread behaves like a zero-coupon bond issued by a borrower: it provides some cash "Now" and costs another, larger amount ($K_2 - K_1$) at expiration. It ensues that the price "Now" is the present value of that future repayment: $$C_1-P_1-(C_2-P_2) = \frac{K_2-K_1}{(1+R)^T}$$ where
+Longing a box spread pays a fixed amount on a given date: economically, the payoff is identical to the one of a [zero-coupon bond](https://en.wikipedia.org/wiki/Zero-coupon_bond). Hence, a short box spread behaves like a zero-coupon bond issued by a borrower: it provides some cash "Now" and costs another, larger amount ($K_2 - K_1$) at expiration. It ensues that the price "Now" is the present value of that future repayment: $$C_1-P_1-(C_2-P_2) = \frac{K_2-K_1}{(1+R)^T}$$ {#eq-price} where
 
 - $T$ = the time to expiration of the options, in years
 - $R$ = the box spread's implied annual rate
@@ -141,24 +141,32 @@ Empirically, $R$ lands slightly above the risk-free rate of the currency and ter
 - EUR (options on the ESTX50 index): about 3.0 to 3.3 % for 1-year box spreads in November 2026 ([Yieldbard](https://yieldbard.com/), 2026); forum users report fills at IBKR's EUR reference rate curve + about 0.1 to 0.2 pp (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37)); and Cayas assumes Euribor 3 months + 0.1 to 0.5 pp in its backtests ([2026](https://cayas.fr/le-journal/msci-world-assurance-vie-pilotee-allocation-cayas-meilleure)).
 
 For comparison:
+
 - a broker's margin loan costs IBKR's reference benchmark rate^[A rate IBKR computes for each currency from "internationally recognized reference rates [...], bank deposit rates, and dynamic interbank rates" ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-benchmarks.php)); 2.485 % for EUR on 12 Nov 2026.] + 1.5 pp up to 90 k€ and + 1 point up to 900 k€, i.e., 3.99 % and 3.49 % in EUR on 15 Nov 2026 ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-rates.php));
 - and a lombard credit €STR + 0.7 to 1.95 pp (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462)).
 
-TODO cover fees
+## Fees {#sec-fees}
+
+On top of the implied rate, opening a short box spread costs fees for each of its four options. With IBKR's tiered pricing, up to 1000 contracts a month for ESTX50 options and 10000 for SPX options:
+
+- ESTX50: 0.90 € of commission ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-futures.php?region=europe))^[IBKR prices European index options with its futures commissions ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php)).] + 0.36 € of exchange fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/GERMAN.php)) = 1.26 € per option, amounting to 5.04 € per box spread;
+- SPX: 0.65 USD of commission + 0.025 USD of OCC clearing fee + 0.0003 USD of Consolidated Audit Trail fee ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas)) + 0.45 USD of CBOE exchange fee + 0.21 USD of CBOE execution surcharge + 0.0125 USD of options regulatory fee + 0.0025 USD of trade processing fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/CBOEoptfee.php)) $\approx$ 1.35 USD per option, amounting to about 5.40 USD per box spread, plus a SEC transaction fee of 0.00206 % of the value of the options sold ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas))^[I.e., the premiums of the call at $K_1$ and of the put at $K_2$, times the multiplier. When the underlying's price lies well between the strikes, they are worth about the face, e.g., about 2 € of fee for a face worth 100 k€.].
+
+These fees are charged per box spread, regardless of its strike width: for a 1-year box spread with a face of 100 k€, 5.04 € adds about 0.005 pp to the rate. Hence, wide strikes keep fees negligible.^[TODO check if the cash settlement at expiration is also charged.]
 
 
 ## Putting it together
 
-Scaling back to real index options: their premiums and strikes are quoted in index points, and each contract pays a fixed currency amount per index point, its multiplier $m$ (100 USD for SPX options, 10 EUR for ESTX50 options, as per their contract's description provided by one's broker). For instance, an ESTX50 box spread with strikes 4150 and 8650 repays $10 \times (8650 - 4150) =$ 45,000 € at expiration. Assuming the legs are built such that $K_1 < K_2$, shorting a box spread:
+Scaling back to real index options: their premiums and strikes are quoted in index points, and each contract pays a fixed currency amount per index point, its multiplier $m$ (100 USD for SPX options, 10 EUR for ESTX50 options, as per their contract's description provided by one's broker). For instance, an ESTX50 box spread with strikes 4150 and 8650 repays $10 \times (8650 - 4150) =$ 45,000 € at expiration. Assuming the legs are built such that $K_1 < K_2$, and with $F$ the fees per box spread (see @sec-fees), shorting a box spread:
 
-- initially provides $$\frac{m(K_2-K_1)}{(1+R)^T}$$; that's the present value of the difference between the two strikes, using the borrowing rate;
+- initially provides $$\frac{m(K_2-K_1)}{(1+R)^T} - F$$; that's the present value of the difference between the two strikes, using the borrowing rate, minus the fees;
 - and costs $$m(K_1 - K_2)$$ at expiration; that's the (negative) difference between the two strikes.
 
 Receive a given amount today, and pay back more, eventually.
 
 ## Computing the rate {#sec-computing-rate}
 
-Rearranging the equation for the cashflow "Now" gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points.
+Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1)}{m\,[C_1-P_1-(C_2-P_2)] - F}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about 0.005 pp for a 1-year box spread with a face of 100 k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing.
 
 The four options are traded together, as a single order with a single limit price for the whole box spread. Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
 

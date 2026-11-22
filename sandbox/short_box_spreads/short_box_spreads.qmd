@@ -42,16 +42,10 @@ The tool used to borrow cash and lever up the portfolio is a specific combinatio
 
 Some key facts about short box spreads:
 
-- they act as fixed-rate loans: get $x$ today and pay back $y$ on a given date, with $x$, $y$, and the term date being known from the start and fixed, and $x < y$;
-    https://en.wikipedia.org/wiki/Box_spread
-    https://www.investopedia.com/terms/b/boxspread.asp
-    https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/
-- they are accessible to French citizens (via a compte-titres ordinaire from the most sophisticated brokers such as Interactive Brokers);
-    https://www.reddit.com/r/vosfinances/comments/1tqzjd4/cayas_meilleur_que_le_100_world/
-    https://cayas.fr/le-journal/ouvrir-et-configurer-son-compte-interactive-brokers
-- they surpass other forms of borrowing (such as consumer credit, lombard credit, leveraged ETFs) in terms of allocation constraints and rate, at the cost of additional complexity;
-    https://youtu.be/fYO19-YkulI
-- they require some expertise^[margin, options] and automated monitoring^[margin maintenance], which means that they are not suitable for all investors.
+- they act as fixed-rate loans: get $x$ today and pay back $y$ on a given date, with $x$, $y$, and the term date being known from the start and fixed, and $x < y$ ([Wikipedia](https://en.wikipedia.org/wiki/Box_spread); ERN, [2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/); see @sec-solving-cashflows);
+- they are accessible to French tax residents via a compte-titres ordinaire (CTO) from the most sophisticated brokers such as Interactive Brokers (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1tqzjd4/cayas_meilleur_que_le_100_world/); [Cayas](https://cayas.fr/le-journal/ouvrir-et-configurer-son-compte-interactive-brokers)), and their interest can reduce one's taxes on capital gains (see @sec-taxation);
+- they surpass other forms of borrowing (margin loans, lombard credit, leveraged ETFs) in terms of rate^[See @sec-solving-cashflows for margin loans and lombard credit. Leveraged ETFs embed financing costs of about 0.3 to 1.4 pp above the short-term rate, on top of their ongoing charges, vs. about 0.1 to 0.5 pp for box spreads (Cayas forum, [2026](https://forum.cayas.fr/t/questions-cout-reel-de-lamundi-msci-world-x2-en-pea/2110/2)).] and of allocation constraints (the borrowed cash can buy any asset, in any proportion), at the cost of additional complexity ([Cayas](https://youtu.be/fYO19-YkulI));
+- they require some expertise (options, margin) and automated monitoring of the margin (see @sec-margin), which means that they are not suitable for all investors.
 
 
 # Semantics
@@ -293,7 +287,7 @@ The currency is the criterion that prevents a single best choice from existing. 
 To borrow cash while avoiding that risk, one can borrow in the currencies they invest the borrowed cash in, in the same proportions (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/s/2KQFH4E4a9)). This costs more complexity (more box spreads to roll), and the rates differ between currencies.
 
 
-# Margin and liquidation risk
+# Margin and liquidation risk {#sec-margin}
 
 ## The short box spread itself
 
@@ -358,7 +352,7 @@ Buying the ETFs first means the equity exists before the loan, and the order pre
 
 ## Rolling {#sec-rolling}
 
-To keep the leverage beyond the term of a short box spread, one shorts a new one with a later expiration date, a few days or weeks before the old one expires. At expiration, the old one settles and its repayment is debited from the new one's cash. Waiting until the last day is damaging but not dramatic on the short term: if the new order isn't filled in time, the repayment is drawn on margin, at the broker's margin loan interest rate (e.g., 3.9 % vs about 3.0 to 3.3 % for box spreads in EUR, see @sec-solving-cashflows).
+To keep the leverage beyond the term of a short box spread, one shorts a new one with a later expiration date, a few days or weeks before the old one expires. At expiration, the old one settles and its repayment is debited from the new one's cash. Waiting until the last day is damaging but not dramatic on the short term: if the new order isn't filled in time, the repayment is drawn on margin, at the broker's margin loan interest rate (e.g., 3.9 % vs. about 3.0 to 3.3 % for box spreads in EUR, see @sec-solving-cashflows).
 
 The new short box spread must provide at least the old one's face. Since each roll borrows the previous face, which includes the interest, the debt grows by the interest at each roll unless part of it is repaid with cash.
 

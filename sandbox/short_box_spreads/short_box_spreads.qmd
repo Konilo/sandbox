@@ -166,7 +166,7 @@ Receive a given amount today, and pay back more, eventually.
 
 ## Computing the rate {#sec-computing-rate}
 
-Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1)}{m\,[C_1-P_1-(C_2-P_2)] - F}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about 0.005 pp for a 1-year box spread with a face of 100 k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing.
+Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1)}{m\,[C_1-P_1-(C_2-P_2)] - F}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about 0.005 pp for a 1-year box spread with a face of 100 k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing. Yet, $R_{\text{post-fees}}$ isn't the end of the story: in France, the interest paid can reduce one's taxes on capital gains, which probably lowers the actual rate further (see @sec-taxation).
 
 The four options are traded together, as a single order with a single limit price for the whole box spread. Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
 
@@ -390,6 +390,23 @@ Delevering implies a few more steps and can be time-sensitive in case of crisis 
         1. immediately sell ETFs with limit orders before the broker liquidates any position itself at market;
         2. once markets calm down, either reduce the debt at the next roll as above, or close the short box spread(s) early by longing the same box spread(s) if the cost of holding the uninvested cash until expiration (the uninvested cash times the gap between the box spread's rate and the interest rate on cash, over the remaining term) exceeds the cost of closing (a bid/ask spread and order fees).
 
+
+# Taxation in France {#sec-taxation}
+
+This section assumes a French tax resident holding the short box spreads and the ETFs in a CTO.
+
+For tax purposes, each of the four options is a separate contract (an "instrument financier à terme", CGI art. 150 ter): its profit or loss is the difference between the amounts received and paid, fees included, and it's realized when the contract is closed or settled ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/9589-PGP)). Over the four options of a short box spread, the result is a loss: the interest plus the fees. That loss is realized entirely in the year of expiration (or of early closing), regardless of when the box spread was shorted.
+
+That loss is "de même nature" as the capital gains on securities such as ETFs ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/2841-PGP), § 20). Hence, it's deducted from the capital gains realized the same year, the remainder being carried forward over the following 10 years; it can't be deducted from other income ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/9588-PGP), § 230). Both the income tax and the social contributions are computed after that deduction ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/2841-PGP), § 470). So, under the PFU of 31.4 % ([Service-Public](https://www.service-public.gouv.fr/particuliers/vosdroits/F21618), 2026), the rate actually paid after tax is about $$R_{\text{post-tax}} \approx R_{\text{post-fees}} \times (1 - 0.314)$$ e.g., about 2.1 % instead of 3 %. By contrast, the interest of a margin loan doesn't reduce the capital gains, as it isn't among the acquisition costs added to the price of the securities ([BOFiP](https://bofip.impots.gouv.fr/bofip/3648-PGP.html/identifiant=BOI-RPPM-PVBMI-20-10-20-10-20191220)). The profits and losses are declared on form 2074, attached to form 2042 ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/9588-PGP)).
+
+However, that saving shouldn't be taken for granted:
+
+- it requires realized capital gains: without enough ETF sales (e.g., at rebalancings), the losses pile up and are lost after 10 years;
+- it requires the trading to be occasional, as part of the management of one's private wealth. Habitual trading, assessed on e.g., the number and frequency of the operations, their technicality, the diversity of the contracts, and the size of the portfolio and of the profits ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/5971-PGP), § 20), makes the profits and losses taxable as BNC, whose losses only offset profits of the same kind ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/5971-PGP), § 60), not ETF gains. A few rolls a year seem far from that (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/s/LhxWJc22AL));
+- in theory, the tax administration could argue that the short box spread is a loan in substance, presented as options to make its interest deductible, which would be an abuse of law (LPF art. L64). However, that requires the operation to be motivated by taxes alone, while its motive is borrowing at the best available rate (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1tqzjd4/comment/oomkohq/)). I found no case where the tax administration made that argument.
+- the rules can change: a reform could restrict, or remove, the deduction of losses on options from capital gains on securities;
+
+Hence, I'd treat the tax saving as a bonus and $R_{\text{post-fees}}$ as the conservative estimate.
 
 # Appendix
 

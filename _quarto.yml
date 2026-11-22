@@ -37,6 +37,7 @@ website:
           - sandbox/cash_or_mmf_between_trades/cash_or_mmf_between_trades.qmd
           - sandbox/portfolio_contribution_complexities/portfolio_contribution_complexities.qmd
           - sandbox/portfolio_optimization/portfolio_optimization.qmd
+          - sandbox/short_box_spreads/short_box_spreads.qmd
 
 format:
   html:

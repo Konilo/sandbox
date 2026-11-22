@@ -63,8 +63,8 @@ Find some fundamentals about options in Elton et al. ([2014](https://www.wiley.c
 | A box spread | (LC + SP) + (SC + LP), each parens being a leg |
 | Leg 1 of a box spread | LC + SP at the same strike i.e., a synthetic long forward (Gantin, [2026](https://www.investopedia.com/terms/s/synthetic-forward-contract.asp)) |
 | Leg 2 of a box spread | SC + LP at the same strike i.e., a synthetic short forward (ibid.) |
-| To short a box spread | Having sold a box spread, i.e., borrowing cash^[A broker may present this trade as *buying* the reversed combination of options at a negative price: shorting a combination (to short (LC + SP) + (SC + LP)) is synonmous to buying its reverse (to long (SC + LP) + (LC + SP)).] |
-| To long box spread | Having bought a box spread i.e., lending cash |
+| To short a box spread | Having sold a box spread, i.e., borrowing cash^[A broker may present this trade as *buying* the reversed combination of options at a negative price: shorting a combination (to short (LC + SP) + (SC + LP)) is synonymous to buying its reverse (to long (SC + LP) + (LC + SP)).] |
+| To long a box spread | Having bought a box spread i.e., lending cash |
 : Semantics {#tbl-semantics}
 
 
@@ -81,7 +81,7 @@ The variables used in this deconstruction of short box spreads are defined as fo
 - $P_2$ = the premium of leg 2's put
 - $S_E$ = the price of the underlying security at expiration
 
-Options control multiple shares of the underlying security (e.g., 100 or 10; we'll count this under the $m$ variable) but the literature's standard doesn't include a factor to account for this ^[from my experience, at least]. For accuracy, the formulas herein consider options controlling a single share. This choice only affects the option premiums which are divided by $m$ relative to the real ones.
+Options control multiple units of the underlying (e.g., 100 or 10; we'll count this under the $m$ variable), but the literature's formulas usually omit this factor without saying so^[from my experience, at least]: they are expressed per unit of the underlying (i.e., per share or per index point). The formulas herein follow that convention, so their premiums and payoffs are the cash amounts divided by $m$; @sec-putting-together scales them back.
 
 Box spreads must be implemented using [European](https://en.wikipedia.org/wiki/Option_style), [cash-settled](https://en.wikipedia.org/wiki/Option_(finance)#According_to_the_delivery_type) options. This study only considers options of this type.
 
@@ -136,7 +136,7 @@ Empirically, $R$ lands slightly above the risk-free rate of the currency and ter
 
 For comparison:
 
-- a broker's margin loan costs IBKR's reference benchmark rate^[A rate IBKR computes for each currency from "internationally recognized reference rates [...], bank deposit rates, and dynamic interbank rates" ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-benchmarks.php)); 2.485 % for EUR on 12 Nov 2026.] + 1.5 pp up to 90 k€ and + 1 point up to 900 k€, i.e., 3.99 % and 3.49 % in EUR on 15 Nov 2026 ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-rates.php));
+- a broker's margin loan costs IBKR's reference benchmark rate^[A rate IBKR computes for each currency from "internationally recognized reference rates [...], bank deposit rates, and dynamic interbank rates" ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-benchmarks.php)); 2.485 % for EUR on 12 Nov 2026.] + 1.5 pp up to 90 k€ and + 1 pp up to 900 k€, i.e., 3.99 % and 3.49 % in EUR on 15 Nov 2026 ([IBKR](https://www.interactivebrokers.ie/en/trading/margin-rates.php));
 - and a lombard credit €STR + 0.7 to 1.95 pp (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462)).
 
 ## Fees {#sec-fees}
@@ -144,14 +144,14 @@ For comparison:
 On top of the implied rate, opening a short box spread costs fees for each of its four options. With IBKR's tiered pricing, up to 1000 contracts a month for ESTX50 options and 10000 for SPX options:
 
 - ESTX50: 0.90 € of commission ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-futures.php?region=europe))^[IBKR prices European index options with its futures commissions ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php)).] + 0.36 € of exchange fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/GERMAN.php)) = 1.26 € per option, amounting to 5.04 € per box spread;
-- SPX: 0.65 USD of commission + 0.025 USD of OCC clearing fee + 0.0003 USD of Consolidated Audit Trail fee ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas)) + 0.45 USD of CBOE exchange fee + 0.21 USD of CBOE execution surcharge + 0.0125 USD of options regulatory fee + 0.0025 USD of trade processing fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/CBOEoptfee.php)) $\approx$ 1.35 USD per option, amounting to about 5.40 USD per box spread, plus a SEC transaction fee of 0.00206 % of the value of the options sold ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas))^[I.e., the premiums of the call at $K_1$ and of the put at $K_2$, times the multiplier. When the underlying's price lies well between the strikes, they are worth about the face, e.g., about 2 € of fee for a face worth 100 k€.].
+- SPX: 0.65 USD of commission + 0.025 USD of OCC clearing fee + 0.0003 USD of Consolidated Audit Trail fee ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas)) + 0.45 USD of CBOE exchange fee + 0.21 USD of CBOE execution surcharge + 0.0125 USD of options regulatory fee + 0.0025 USD of trade processing fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/CBOEoptfee.php)) $\approx$ 1.35 USD per option, amounting to about 5.40 USD per box spread, plus a SEC transaction fee of 0.00206 % of the value of the options sold ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas))^[I.e., the premiums of the call at $K_1$ and of the put at $K_2$, times the multiplier. When the underlying's price lies well between the strikes, they are worth about the face, e.g., about 2 USD of fee for a face of 100 kUSD.].
 
 At expiration, two of the four options end in the money whatever $S_E$: a long one, which is exercised, and a short one, which is assigned. IBKR charges its standard commission on both for ESTX50 options i.e., 1.80 € per box spread, and nothing for SPX options ([IBKR](https://www.interactivebrokers.ie/en/pricing/other-fees.php)).
 
-These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.008 pp to the rate. Hence, wide strikes keep fees negligible. E.g., Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)). ERN reports about 6 USD of fees for a 50 kUSD SPX box spread ([2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/)). Conversely, fees weigh on small box spreads: a forum user recommends at least about 10 k€ per box spread (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/oodjwfb/)).
+These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.008 pp to the rate. Hence, wide strikes keep fees negligible. E.g., a Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)). ERN reports about 6 USD of fees for a 50 kUSD SPX box spread ([2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/)). Conversely, fees weigh on small box spreads: a forum user recommends at least about 10 k€ per box spread (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/oodjwfb/)).
 
 
-## Putting it together
+## Putting it together {#sec-putting-together}
 
 Scaling back to real index options: their premiums and strikes are quoted in index points, and each contract pays a fixed currency amount per index point, its multiplier $m$ (100 USD for SPX options, 10 EUR for ESTX50 options, as per their contract's description provided by one's broker). For instance, an ESTX50 box spread with strikes 4150 and 8650 repays $10 \times (8650 - 4150) =$ 45,000 € at expiration. Assuming the legs are built such that $K_1 < K_2$, and with $F_0$ the fees per box spread charged now and $F_E$ those charged at expiration (see @sec-fees), shorting a box spread:
 
@@ -166,7 +166,7 @@ Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1
 
 The four options are traded together, as a single order with a single limit price for the whole box spread, never as a market order (ERN, [2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/)). Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
 
-- IBKR's TWS shows its reference EUR and USD interest rate curves^[New Window > Option Analysis > Interactive Analytics > Interest Rate; used as such by Cayas co-founder ([Cayas forum, 2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37))]: its smoothed forward curve + about 0.1 pp is the most reliable starting point, according to Cayas co-founder (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35));
+- IBKR's TWS shows its reference EUR and USD interest rate curves^[New Window > Option Analysis > Interactive Analytics > Interest Rate.]: its smoothed forward curve + about 0.1 pp is the most reliable starting point, according to a Cayas co-founder (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35), [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37));
 - [boxtrades.com](https://www.boxtrades.com/) publishes the SPX box spread yield curve, derived from trades;
 - [Yieldbard](https://yieldbard.com/) publishes ESTX50 and SPX box spread yield curves and recent trades (the EUR curve is not derived from trades but from closing prices);
 - the [Box tab of Portfolio Construction](https://portfolio-construction.freeboxos.fr/?section=box.interest-rate-swap-curves#box) takes a target rate and returns the corresponding limit price.
@@ -175,8 +175,8 @@ The four options are traded together, as a single order with a single limit pric
 # Sizing a short box spread loan
 
 - The amount owed at expiration date (= the **face** of the loan) is $$face = m \times N_{\text{box spreads}} \times -(K_1 - K_2)$$ ^[The added "$-$" just converts the negative cashflow expression from @tbl-together into a positive amount]. It's controlled by both
-	- the strike width $K_1-K_2$ of the boxe(s)
-	- and the number of box spreads sold $N_{\text{box spreads}}$
+	- the strike width $K_2-K_1$ of the box spread(s)
+	- and the number of box spreads shorted $N_{\text{box spreads}}$
 
 ```{r}
 #| label: fig-payoff
@@ -293,7 +293,7 @@ Exchange rates also affect the liquidation risk (see @sec-margin): when the debt
 
 ## The short box spread itself
 
-Shorting a box spread has little impact on an account's equity: the cash received is offset by the short box spread's liability, valued at about the same amount. The short box spread also carries almost no market risk since its payoff doesn't depend on the underlying, as exposed earlier. Hence, under IBKR's risk-based margin model, it adds almost nothing to the margin requirements: an order preview of a short ESTX50 box spread repaying 3 k€ showed initial and maintenance margin requirements of 3.87 € each i.e., about 0.13 % of the loan^[Order preview in IBKR Desktop, November 2026. The same order preview showed the equity dropping by about 19 € right away, presumably because IBKR values the new liability at its own fair price: shorting the box spread at a less favorable price than that (i.e., receiving less cash) is an immediate, mark-to-market cost.]. Over the short box spread's life, though, its liability^[The account's equity equals its assets minus its liabilities.] is marked to market by IBKR: it rises toward the face as the interest accrues (e.g., from about 97.1 k€ to 100 k€ for a 1-year box spread with a face of 100 k€ at 3 %), and it rises further when market rates for the remaining term fall (by about 1 % of the face for a 1 pp fall, 1 year before expiration). Both lower the equity, hence the excess liquidity^[the equity minus the maintenance margin requirement], while the maintenance margin requirement barely changes. Yet, the amount repaid at expiration remains the face (see @sec-solving-cashflows): the effect of rates is a paper loss that vanishes by expiration.
+Shorting a box spread has little impact on an account's equity: the cash received is offset by the short box spread's liability, valued at about the same amount. The short box spread also carries almost no market risk since its payoff doesn't depend on the underlying, as exposed earlier. Hence, under IBKR's risk-based margin model, it adds almost nothing to the margin requirements: an order preview of a short ESTX50 box spread repaying 3 k€ showed initial and maintenance margin requirements of 3.87 € each i.e., about 0.13 % of the loan^[Order preview in IBKR Desktop, November 2026. The same order preview showed the equity dropping by about 19 € right away, presumably because IBKR values the new liability at its own fair price: shorting the box spread at a less favorable price than that (i.e., receiving less cash) is an immediate, mark-to-market cost.]. Over the short box spread's life, though, its liability^[The account's equity equals its assets minus its liabilities.] is marked to market by IBKR: it rises toward the face as the interest accrues (e.g., from about 97.1 k€ to 100 k€ for a 1-year box spread with a face of 100 k€ at 3 %), and it rises further when market rates for the remaining term fall (by about 1 % of the face for a 1 pp fall, 1 year before expiration). Both lower the equity, hence the excess liquidity^[The equity minus the maintenance margin requirement.], while the maintenance margin requirement barely changes. Yet, the amount repaid at expiration remains the face (see @sec-solving-cashflows): the effect of rates is a paper loss that vanishes by expiration.
 
 ## The assets bought with the loan
 
@@ -307,22 +307,22 @@ With
 
 - $A_0$ = the assets' value initially, and $d$ = their drawdown, so that they are worth $A_0(1-d)$
 - $L$ = the leverage, i.e., the assets' value divided by the equity, initially
-- $D = A_0(1 - 1/L)$ = the debt, which is fixed
-- $m$ = the maintenance margin ratio of the assets
+- $D = A_0(1 - 1/L)$ = the debt, which is fixed (ignoring the accrued interest^[Over a 1-year term at 3 %, the debt grows by 3 %, which lowers $d^*$ by about $(1-1/L) \times 3\,\% / (1-r_m)$, e.g., from 33 % to 31 % at $L = 2$ and $r_m = 25\,\%$. That's small relative to the safety margin argued for below, and the leverage is reset at each roll (see @sec-rolling).])
+- $r_m$ = the maintenance margin ratio of the assets
 
 the broker liquidates positions as soon as the equity falls below the maintenance margin requirement. The equity being the assets minus the debt, the drawdown $d^*$ triggering liquidation solves
-$$\underbrace{A_0(1-d^*) - D}_{\text{equity}} = \underbrace{m \, A_0(1-d^*)}_{\text{maintenance margin requirement}}$$
-$$d^* = 1 - \frac{1 - 1/L}{1 - m}$$ {#eq-dstar}
+$$\underbrace{A_0(1-d^*) - D}_{\text{equity}} = \underbrace{r_m \, A_0(1-d^*)}_{\text{maintenance margin requirement}}$$
+$$d^* = 1 - \frac{1 - 1/L}{1 - r_m}$$ {#eq-dstar}
 
 ```{r}
 #| label: tbl-liquidation
 #| tbl-cap: "Drawdown of the assets triggering liquidation ($d^*$), by leverage and maintenance margin ratio"
 
-liquidation <- CJ(L = c(1.25, 1.5, 2, 2.5), m = c(0.25, 0.25 * 1.35, 0.5))
-liquidation[, d := pmax(0, 1 - (1 - 1 / L) / (1 - m))]
-liquidation[, m := sprintf("m = %.0f %%", 100 * m)]
+liquidation <- CJ(L = c(1.25, 1.5, 2, 2.5), r_m = c(0.25, 0.25 * 1.35, 0.5))
+liquidation[, d := pmax(0, 1 - (1 - 1 / L) / (1 - r_m))]
+liquidation[, r_m := sprintf("r_m = %.0f %%", 100 * r_m)]
 liquidation[, d := sprintf("%.0f %%", 100 * d)]
-dcast(liquidation, L ~ m, value.var = "d") |>
+dcast(liquidation, L ~ r_m, value.var = "d") |>
     kable(align = "r")
 ```
 
@@ -330,13 +330,13 @@ At IBKR, UCITS ETFs typically have a maintenance margin ratio of 25 % (r/vosfina
 
 ## The maintenance margin ratios can change
 
-An instrument's maintenance margin ratio isn't fixed: IBKR "can increase its 'house' maintenance margin requirements at any time" often with immediate effect, and no upper limit ([IBKR Ireland](https://www.lynxbroker.com/media/doc/IBIE/4761_IBIE_DISCLOSURE_OF_RISKS_OF_MARGIN_TRADING_ENG.pdf), 2020). Precedents include market-wide increases of about 35 % (e.g., from 25 % to about 34 %) around the 2020 US election, and increases on specific instruments up to 87 % or 100 % (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1vh7lfr/ibkr_maintenance_margin_call/); r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/omnva37/)).
+An instrument's maintenance margin ratio isn't fixed: IBKR "can increase its 'house' maintenance margin requirements at any time" often with immediate effect, and no upper limit ([IBKR Ireland](https://www.lynxbroker.com/media/doc/IBIE/4761_IBIE_DISCLOSURE_OF_RISKS_OF_MARGIN_TRADING_ENG.pdf), 2020). Precedents include market-wide increases of about 35 % (e.g., from 25 % to about 34 %) around the 2020 US election, and increases on specific instruments up to 87 % or 100 % (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1vh7lfr/ibkr_maintenance_margin_call/), [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/omnva37/)).
 
-Setting $d^* = 0$ in @eq-dstar shows that an increase alone, without any market move, triggers liquidation as soon as $m \geq 1/L$, e.g., $m \geq 50\,\%$ at $2\times$ leverage. This argues for (i) keeping the leverage well below what market drawdowns alone would allow, (ii) for spreading the assets over several instruments, so that an increase on one of them affects the account's maintenance margin requirement only in proportion to its weight, and (iii) for favoring large, liquid instruments, to avoid the add-ons IBKR's risk-based model applies to concentrated, illiquid, or volatile positions ([IBKR](https://www.interactivebrokers.com/lib/cstools/faq/content/1163246347)).
+Setting $d^* = 0$ in @eq-dstar shows that an increase alone, without any market move, triggers liquidation as soon as $r_m \geq 1/L$, e.g., $r_m \geq 50\,\%$ at $2\times$ leverage. This argues for (i) keeping the leverage well below what market drawdowns alone would allow, (ii) spreading the assets over several instruments, so that an increase on one of them affects the account's maintenance margin requirement only in proportion to its weight, and (iii) favoring large, liquid instruments, to avoid the add-ons IBKR's risk-based model applies to concentrated, illiquid, or volatile positions ([IBKR](https://www.interactivebrokers.com/lib/cstools/faq/content/1163246347)).
 
 ## Liquidation
 
-IBKR liquidates positions automatically, at market, as soon as the excess liquidity (the equity minus the maintenance margin requirement) goes negative, without letting the client choose which positions are sold (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/omn1ijx/); [IBKR Ireland](https://www.lynxbroker.com/media/doc/IBIE/4761_IBIE_DISCLOSURE_OF_RISKS_OF_MARGIN_TRADING_ENG.pdf), 2020). This can break a short box spread position, resulting in an uncertain, potentially damaging payoff. A bad mark could also trigger such a liquidation: IBKR sometimes marks illiquid legs, such as far out-of-the-money ones, oddly, e.g., a displayed loss of about 4 kUSD on a 20 kUSD SPX box spread after the close (Bogleheads, [2024](https://www.bogleheads.org/forum/viewtopic.php?p=7756973#p7756973)). However, IBKR support states that it applies sanity checks to options with wide markets and reviews such margin deficits manually before liquidating (Bogleheads, [2021](https://www.bogleheads.org/forum/viewtopic.php?p=6389342#p6389342)), and I found no record of a box spread liquidated because of a bad mark. Some forum users also keep an unexecutable GTC order to close each box spread, so that IBKR treats the four options as a box spread, an unverified practice (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/oodjwfb/)). Hence the need for automated monitoring on the excess liquidity.
+IBKR liquidates positions automatically, at market, as soon as the excess liquidity goes negative, without letting the client choose which positions are sold (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/omn1ijx/); [IBKR Ireland](https://www.lynxbroker.com/media/doc/IBIE/4761_IBIE_DISCLOSURE_OF_RISKS_OF_MARGIN_TRADING_ENG.pdf), 2020). This can break a short box spread position, resulting in an uncertain, potentially damaging payoff. A bad mark could also trigger such a liquidation: IBKR sometimes marks illiquid legs, such as far out-of-the-money ones, oddly, e.g., a displayed loss of about 4 kUSD on a 20 kUSD SPX box spread after the close (Bogleheads, [2024](https://www.bogleheads.org/forum/viewtopic.php?p=7756973#p7756973)). However, IBKR support states that it applies sanity checks to options with wide markets and reviews such margin deficits manually before liquidating (Bogleheads, [2021](https://www.bogleheads.org/forum/viewtopic.php?p=6389342#p6389342)), and I found no record of a box spread liquidated because of a bad mark. Some forum users also keep an unexecutable GTC order to close each box spread, so that IBKR treats the four options as a box spread, an unverified practice (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/oodjwfb/)). Hence the need for automated monitoring on the excess liquidity.
 
 
 # Lifecycle of a levered portfolio
@@ -354,7 +354,7 @@ Buying the ETFs first means the equity exists before the loan, and the order pre
 
 ## Rolling {#sec-rolling}
 
-To keep the leverage beyond the term of a short box spread, one shorts a new one with a later expiration date, a few days or weeks before the old one expires. At expiration, the old one settles and its repayment is debited from the new one's cash. Waiting until the last day is damaging but not dramatic on the short term: if the new order isn't filled in time, the repayment is drawn on margin, at the broker's margin loan interest rate (e.g., 3.9 % vs. about 3.0 to 3.3 % for box spreads in EUR, see @sec-solving-cashflows).
+To keep the leverage beyond the term of a short box spread, one shorts a new one with a later expiration date, a few days or weeks before the old one expires. At expiration, the old one settles and its repayment is debited from the new one's cash. Waiting until the last day is damaging but not dramatic on the short term: if the new order isn't filled in time, the repayment is drawn on margin, at the broker's margin loan interest rate (e.g., 4.0 % vs. about 3.0 to 3.3 % for box spreads in EUR, see @sec-solving-cashflows).
 
 The new short box spread must provide at least the old one's face. Since each roll borrows the previous face, which includes the interest, the debt grows by the interest at each roll unless part of it is repaid with cash.
 
@@ -364,7 +364,7 @@ Laddering consists in splitting the debt across several short box spreads with s
 - a roll that fails to get filled in time only affects a fraction of the debt;
 - the debt's rate is averaged over several dates instead of depending on a single day's market.
 
-And the costs is additional complexity: four (in our example) short box spreads to monitor and roll^[times the number of currencies one borrows in].
+And the cost is additional complexity: four (in our example) short box spreads to monitor and roll^[times the number of currencies one borrows in].
 
 ## Rebalancing
 
@@ -376,7 +376,7 @@ The leverage ratio evolves with the market: it increases when the assets fall, a
 Delevering implies a few more steps and can be time-sensitive in case of crisis (liquidation risk), so let's expand.
 
 - One delevers by selling ETFs e.g., for an amount $S$. The account's equity doesn't change (ETF shares are swapped for their worth in cash), but:
-    - the maintenance margin requirement decreases by $m \times S$, since the sold ETF shares contributed to it while cash doesn't (the excess liquidity increases by as much);
+    - the maintenance margin requirement decreases by $r_m \times S$, since the sold ETF shares contributed to it while cash doesn't (the excess liquidity increases by as much);
     - the leverage ratio decreases from $A/E$ to $(A - S)/E$, with $A$ the ETFs' value and $E$ the equity: the debt is still there, but the cash now offsets $S$ of it.
 - Actually repaying the debt can wait. Two possible sequences of actions to delever:
     - In normal times, the debt is reduced at a roll:
@@ -402,7 +402,7 @@ However, that saving shouldn't be taken for granted:
 - it requires realized capital gains: without enough ETF sales (e.g., at rebalancings), the losses pile up and are lost after 10 years;
 - it requires the trading to be occasional, as part of the management of one's private wealth. Habitual trading, assessed on e.g., the number and frequency of the operations, their technicality, the diversity of the contracts, and the size of the portfolio and of the profits ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/5971-PGP), § 20), makes the profits and losses taxable as BNC, whose losses only offset profits of the same kind ([BOFiP](https://bofip.impots.gouv.fr/doctrine/pgp/5971-PGP), § 60), not ETF gains. A few rolls a year seem far from that (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/s/LhxWJc22AL));
 - in theory, the tax administration could argue that the short box spread is a loan in substance, presented as options to make its interest deductible, which would be an abuse of law (LPF art. L64). However, that requires the operation to be motivated by taxes alone, while its motive is borrowing at the best available rate (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1tqzjd4/comment/oomkohq/)). Forum users acknowledge the risk, which only a *rescrit fiscal* would settle (r/LETFs, [2025](https://www.reddit.com/r/LETFs/comments/1mtmog5/comment/nc07338/); r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1tqzjd4/comment/oopybo1/)). I found no case where the tax administration made that argument.
-- the rules can change: a reform could restrict, or remove, the deduction of losses on options from capital gains on securities;
+- the rules can change: a reform could restrict, or remove, the deduction of losses on options from capital gains on securities.
 
 Hence, I'd treat the tax saving as a bonus and $R_{\text{post-fees}}$ as the conservative estimate.
 

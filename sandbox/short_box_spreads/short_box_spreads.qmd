@@ -148,7 +148,7 @@ On top of the implied rate, opening a short box spread costs fees for each of it
 
 At expiration, two of the four options end in the money whatever $S_E$: a long one, which is exercised, and a short one, which is assigned. IBKR charges its standard commission on both for ESTX50 options i.e., 1.80 € per box spread, and nothing for SPX options ([IBKR](https://www.interactivebrokers.ie/en/pricing/other-fees.php)).
 
-These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.007 pp to the rate. Hence, wide strikes keep fees negligible.
+These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.007 pp to the rate. Hence, wide strikes keep fees negligible. E.g., Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)).
 
 
 ## Putting it together
@@ -166,9 +166,9 @@ Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1
 
 The four options are traded together, as a single order with a single limit price for the whole box spread. Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
 
+- IBKR's TWS shows its reference EUR and USD interest rate curves^[New Window > Option Analysis > Interactive Analytics > Interest Rate; used as such by Cayas co-founder ([Cayas forum, 2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37))]: its smoothed forward curve + about 0.1 pp is the most reliable starting point, according to Cayas co-founder (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35));
 - [boxtrades.com](https://www.boxtrades.com/) publishes the SPX box spread yield curve, derived from trades;
 - [Yieldbard](https://yieldbard.com/) publishes ESTX50 and SPX box spread yield curves and recent trades (the EUR curve is not derived from trades but from closing prices);
-- IBKR's TWS shows its reference EUR and USD rate curves^[New Window > Option Analysis > Interactive Analytics > Interest Rate; used as such by forum members ([Cayas forum, 2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/37))].
 - the [Box tab of Portfolio Construction](https://portfolio-construction.freeboxos.fr/?section=box.interest-rate-swap-curves#box) takes a target rate and returns the corresponding limit price.
 
 

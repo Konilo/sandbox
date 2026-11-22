@@ -230,7 +230,7 @@ base_layers <- list(
 
 p_options <- ggplot(options_dt, aes(S, y, color = group)) +
     geom_line(linewidth = 0.9) +
-    facet_wrap(~line, ncol = 2) +
+    facet_wrap(~line, ncol = 2, dir = "v") +
     ggtitle("1. The four options") +
     base_layers
 

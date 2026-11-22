@@ -148,7 +148,7 @@ On top of the implied rate, opening a short box spread costs fees for each of it
 
 At expiration, two of the four options end in the money whatever $S_E$: a long one, which is exercised, and a short one, which is assigned. IBKR charges its standard commission on both for ESTX50 options i.e., 1.80 € per box spread, and nothing for SPX options ([IBKR](https://www.interactivebrokers.ie/en/pricing/other-fees.php)).
 
-These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.007 pp to the rate. Hence, wide strikes keep fees negligible. E.g., Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)).
+These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.008 pp to the rate. Hence, wide strikes keep fees negligible. E.g., Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)).
 
 
 ## Putting it together
@@ -162,7 +162,7 @@ Receive a given amount today, and pay back more, eventually.
 
 ## Computing the rate {#sec-computing-rate}
 
-Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1) + F_E}{m\,[C_1-P_1-(C_2-P_2)] - F_0}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about 0.007 pp for a 1-year box spread with a face of 100 k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing. Yet, $R_{\text{post-fees}}$ isn't the end of the story: in France, the interest paid can reduce one's taxes on capital gains, which probably lowers the actual rate further (see @sec-taxation).
+Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1) + F_E}{m\,[C_1-P_1-(C_2-P_2)] - F_0}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about 0.008 pp for a 1-year box spread with a face of 100 k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing. Yet, $R_{\text{post-fees}}$ isn't the end of the story: in France, the interest paid can reduce one's taxes on capital gains, which probably lowers the actual rate further (see @sec-taxation).
 
 The four options are traded together, as a single order with a single limit price for the whole box spread. Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
 

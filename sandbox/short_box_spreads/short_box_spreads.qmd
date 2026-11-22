@@ -286,6 +286,8 @@ The currency is the criterion that prevents a single best choice from existing. 
 
 To borrow cash while avoiding that risk, one can borrow in the currencies they invest the borrowed cash in, in the same proportions (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/s/2KQFH4E4a9)). This costs more complexity (more box spreads to roll), and the rates differ between currencies.
 
+Exchange rates also affect the liquidation risk (see @sec-margin): when the debt and the assets are exposed to different currencies, exchange rate moves change the equity, hence the excess liquidity. E.g., with debt in USD, a USD appreciation during a drawdown increases the debt as the assets fall (r/VosSous, [2026](https://www.reddit.com/r/VosSous/comments/1vwxlwr/comment/p5mf6s0/)), and the USD has generally appreciated in past risk-off episodes (with exceptions in early 2020 and April 2025) ([ECB](https://www.ecb.europa.eu/press/financial-stability-publications/fsr/special/html/ecb.fsrart202511_01~fdf147a04a.en.html), 2025). Conversely, with debt in EUR and assets exposed to USD, a USD depreciation during a drawdown deepens it, as in April 2025 ([ECB](https://www.ecb.europa.eu/press/financial-stability-publications/fsr/special/html/ecb.fsrart202511_01~fdf147a04a.en.html), 2025).
+
 
 # Margin and liquidation risk {#sec-margin}
 

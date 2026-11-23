@@ -141,14 +141,33 @@ For comparison:
 
 ## Fees {#sec-fees}
 
+```{r}
+#| label: fees
+
+eur <- function(x) format(x, nsmall = 2)
+
+# ESTX50 fees per option, in EUR (sources in the bullets below)
+estx_commission <- 0.90
+estx_exchange_fee <- 0.36
+estx_fee_open <- 4 * (estx_commission + estx_exchange_fee) # 4 options traded
+estx_fee_expiry <- 2 * estx_commission # 2 options exercised or assigned
+
+# Rate added by these fees for a 1-year box spread
+fee_face <- 100000
+fee_R <- 0.03 # illustrative 1-year rate
+fee_proceeds <- fee_face / (1 + fee_R)
+fee_R_post <- (fee_face + estx_fee_expiry) / (fee_proceeds - estx_fee_open) - 1
+fee_impact_pp <- signif((fee_R_post - fee_R) * 100, 1)
+```
+
 On top of the implied rate, opening a short box spread costs fees for each of its four options. With IBKR's tiered pricing, up to 1000 contracts a month for ESTX50 options and 10000 for SPX options:
 
-- ESTX50: 0.90 € of commission ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-futures.php?region=europe))^[IBKR prices European index options with its futures commissions ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php)).] + 0.36 € of exchange fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/GERMAN.php)) = 1.26 € per option, amounting to 5.04 € per box spread;
+- ESTX50: `r eur(estx_commission)` € of commission ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-futures.php?region=europe))^[IBKR prices European index options with its futures commissions ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php)).] + `r eur(estx_exchange_fee)` € of exchange fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/GERMAN.php)) = `r eur(estx_commission + estx_exchange_fee)` € per option, amounting to `r eur(estx_fee_open)` € per box spread;
 - SPX: 0.65 USD of commission + 0.025 USD of OCC clearing fee + 0.0003 USD of Consolidated Audit Trail fee ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas)) + 0.45 USD of CBOE exchange fee + 0.21 USD of CBOE execution surcharge + 0.0125 USD of options regulatory fee + 0.0025 USD of trade processing fee ([IBKR](https://www.interactivebrokers.ie/en/accounts/fees/CBOEoptfee.php)) $\approx$ 1.35 USD per option, amounting to about 5.40 USD per box spread, plus a SEC transaction fee of 0.00206 % of the value of the options sold ([IBKR](https://www.interactivebrokers.ie/en/pricing/commissions-options.php?region=americas))^[I.e., the premiums of the call at $K_1$ and of the put at $K_2$, times the multiplier. When the underlying's price lies well between the strikes, they are worth about the face, e.g., about 2 USD of fee for a face of 100 kUSD.].
 
-At expiration, two of the four options end in the money whatever $S_E$: a long one, which is exercised, and a short one, which is assigned. IBKR charges its standard commission on both for ESTX50 options i.e., 1.80 € per box spread, and nothing for SPX options ([IBKR](https://www.interactivebrokers.ie/en/pricing/other-fees.php)).
+At expiration, two of the four options end in the money whatever $S_E$: a long one, which is exercised, and a short one, which is assigned. IBKR charges its standard commission on both for ESTX50 options i.e., `r eur(estx_fee_expiry)` € per box spread, and nothing for SPX options ([IBKR](https://www.interactivebrokers.ie/en/pricing/other-fees.php)).
 
-These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of 100 k€, 5.04 € + 1.80 € = 6.84 € adds about 0.007 pp to the rate. Hence, wide strikes keep fees negligible. E.g., a Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)). ERN reports about 6 USD of fees for a 50 kUSD SPX box spread ([2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/)). Conversely, fees weigh on small box spreads: a forum user recommends at least about 10 k€ per box spread (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/oodjwfb/)).
+These fees are charged per box spread, regardless of its strike width: for a 1-year ESTX50 box spread with a face of `r fee_face / 1000` k€, `r eur(estx_fee_open)` € + `r eur(estx_fee_expiry)` € = `r eur(estx_fee_open + estx_fee_expiry)` € adds about `r fee_impact_pp` pp to the rate. Hence, wide strikes keep fees negligible. E.g., a Cayas co-founder systematically uses the widest strikes listed to minimize the number of contracts (Cayas forum, [2026](https://forum.cayas.fr/t/box-spread-pour-financer-sa-vie-vs-credit-lombard-le-hack-sous-cote-ou-usine-a-gaz/1462/35)). ERN reports about 6 USD of fees for a 50 kUSD SPX box spread ([2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/)). Conversely, fees weigh on small box spreads: a forum user recommends at least about 10 k€ per box spread (r/vosfinances, [2026](https://www.reddit.com/r/vosfinances/comments/1thfw1n/comment/oodjwfb/)).
 
 
 ## Putting it together {#sec-putting-together}
@@ -162,7 +181,7 @@ Receive a given amount today, and pay back more, eventually.
 
 ## Computing the rate {#sec-computing-rate}
 
-Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1) + F_E}{m\,[C_1-P_1-(C_2-P_2)] - F_0}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about 0.007 pp for a 1-year box spread with a face of 100 k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing. Yet, $R_{\text{post-fees}}$ isn't the end of the story: in France, the interest paid can reduce one's taxes on capital gains, which probably lowers the actual rate further (see @sec-taxation).
+Rearranging @eq-price gives the implied interest rate: $$R = \left(\frac{K_2-K_1}{C_1-P_1-(C_2-P_2)}\right)^{1/T} - 1$$ with all terms in index points. Including the fees, the rate actually paid (aka the all-in rate) is $$R_{\text{post-fees}} = \left(\frac{m(K_2-K_1) + F_E}{m\,[C_1-P_1-(C_2-P_2)] - F_0}\right)^{1/T} - 1$$ which is only slightly above $R$ e.g., by about `r fee_impact_pp` pp for a 1-year box spread with a face of `r fee_face / 1000` k€. $R$ is the one to compare with the references below, which ignore fees; $R_{\text{post-fees}}$ is the one to compare with other ways of borrowing. Yet, $R_{\text{post-fees}}$ isn't the end of the story: in France, the interest paid can reduce one's taxes on capital gains, which probably lowers the actual rate further (see @sec-taxation).
 
 The four options are traded together, as a single order with a single limit price for the whole box spread, never as a market order (ERN, [2021](https://earlyretirementnow.com/2021/12/09/low-cost-leverage-box-spread/)). Plugging a candidate limit price into this formula gives the corresponding rate, so the rate is known before submitting the order. Comparing it with references tells whether the limit price is sensible: a rate well above them means accepting to borrow more expensively than necessary; a rate well below them means the order is unlikely to be executed, as lenders can earn more elsewhere. References:
 

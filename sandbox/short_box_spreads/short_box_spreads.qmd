@@ -2,6 +2,7 @@
 title: "Short Box Spreads"
 author: "Konilo Zio"
 date: "2026-11-11"
+date-modified: "2026-11-23"
 execute:
     echo: false
 ---
